@@ -1,0 +1,29 @@
+# Reference compose for the Attendee UI (timeclock).
+#
+# It must reach the main assistant container by name, so both stacks join one
+# external network. One-time setup on the server:
+#   docker network create spx-net
+# ...and add the same `networks:` block to the MAIN app's compose file.
+
+services:
+  attendee-ui:
+    build:
+      context: .
+      args:
+        NEXT_PUBLIC_AUTH_ENABLED: "true"
+    container_name: attendee-ui
+    restart: unless-stopped
+    env_file: .env.local
+    ports:
+      - "3210:3000" # Caddy proxies /clock* here
+    volumes:
+      - attendee-data:/app/data
+    networks:
+      - spx-net
+
+volumes:
+  attendee-data:
+
+networks:
+  spx-net:
+    external: true

@@ -1,0 +1,50 @@
+@import "tailwindcss";
+
+/* Same design tokens as the main SuperPixel Assistant app. */
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --color-parchment: #f7f4eb;
+  --color-parchment-dark: #eae5d6;
+  --color-ink: #3d3929;
+  --color-ink-soft: #6e6a5b;
+  --color-ink-faint: #98937e;
+  --color-accent: #2a73e1;
+  --color-accent-hover: #1e5fc0;
+  --color-accent-soft: #e2ecfa;
+  --color-line: #dcd5c1;
+  --color-card: #f0ecdf;
+
+  --font-serif-display: "Georgia", "Times New Roman", serif;
+}
+
+:root {
+  color-scheme: light;
+}
+
+html.dark {
+  color-scheme: dark;
+  --color-parchment: #262624;
+  --color-parchment-dark: #1c1c1a;
+  --color-ink: #e8e6dc;
+  --color-ink-soft: #b3af9f;
+  --color-ink-faint: #817d6c;
+  --color-accent: #4c8ae8;
+  --color-accent-hover: #6ba0ee;
+  --color-accent-soft: #1c2a44;
+  --color-line: #3a3833;
+  --color-card: #2d2c29;
+}
+
+html,
+body {
+  height: 100%;
+  background-color: var(--color-parchment);
+  color: var(--color-ink);
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-line) transparent;
+}
