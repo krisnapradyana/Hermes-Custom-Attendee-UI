@@ -1,9 +1,8 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
-  // Served behind Caddy at https://<domain>/clock — same domain as the main
-  // assistant app, so one cert and one Slack app cover both.
-  basePath: "/clock",
+  // Served on its OWN subdomain (clock.<domain>) — DuckDNS resolves every
+  // sub-subdomain to the same IP, Caddy routes by hostname. No basePath.
   // Slim self-contained server bundle for Docker deployment.
   output: "standalone",
 };

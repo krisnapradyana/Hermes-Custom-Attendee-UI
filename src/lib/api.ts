@@ -1,9 +1,9 @@
 /**
- * Client fetch helper (same contract as the main app's lib/api.ts), plus the
- * basePath prefix — fetch() is NOT basePath-aware, unlike <Link>.
+ * Client fetch helper (same contract as the main app's lib/api.ts).
+ * The app lives at the root of its own subdomain — no path prefix.
  */
 
-export const BASE_PATH = "/clock";
+export const BASE_PATH = "";
 
 export type ApiResult<T> = { ok: true; data: T } | { ok: false; error: string };
 

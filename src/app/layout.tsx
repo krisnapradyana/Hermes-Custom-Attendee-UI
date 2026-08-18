@@ -19,7 +19,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en" suppressHydrationWarning>
       <head>
         <script
-          // Follow the same saved theme as the main app (shared domain).
+          // Same theme mechanism as the main app (own subdomain = own saved
+          // preference; defaults to the system theme).
           dangerouslySetInnerHTML={{
             __html: `(function(){try{var t=localStorage.getItem('hermes-theme')||'system';var d=t==='dark'||(t==='system'&&matchMedia('(prefers-color-scheme: dark)').matches);if(d)document.documentElement.classList.add('dark');}catch(e){}})();`,
           }}

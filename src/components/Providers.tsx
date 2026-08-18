@@ -6,8 +6,7 @@ import { Clock } from "lucide-react";
 const AUTH_ENABLED = process.env.NEXT_PUBLIC_AUTH_ENABLED === "true";
 
 export function Providers({ children }: { children: React.ReactNode }) {
-  // next-auth lives under the app's basePath — the provider must know.
-  return <SessionProvider basePath="/clock/api/auth">{children}</SessionProvider>;
+  return <SessionProvider>{children}</SessionProvider>;
 }
 
 export function AuthGate({ children }: { children: React.ReactNode }) {
