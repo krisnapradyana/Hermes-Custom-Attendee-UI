@@ -9,6 +9,8 @@ export interface TcProject {
   id: string;
   name: string;
   color: string;
+  /** Slack id of the project's creator (their projects count as "assigned"). */
+  createdBy?: string;
 }
 
 export type TaskStatus = "todo" | "doing" | "review" | "revision" | "done";

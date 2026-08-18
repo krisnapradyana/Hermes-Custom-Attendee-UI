@@ -26,6 +26,8 @@ import { TcProject, TcTask } from "@/lib/projects";
 interface Me {
   active: { projectId: string; inAt: string } | null;
   week: { projectId: string; ms: number }[];
+  /** Projects I have ever clocked time in. */
+  touched: string[];
   projects: TcProject[];
   tasks: TcTask[];
 }
@@ -80,15 +82,25 @@ export default function ClockPage() {
     [me]
   );
 
-  const projects = useMemo(() => {
-    const list = [...(me?.projects ?? [])];
-    // Most-worked-this-week first, then name.
-    return list.sort(
+  // "My" projects = assigned via a task, created by me, worked in before,
+  // or currently active. Everything else hides under "Other projects".
+  const { mineProjects, otherProjects } = useMemo(() => {
+    const list = [...(me?.projects ?? [])].sort(
       (a, b) =>
         (weekByProject.get(b.id) ?? 0) - (weekByProject.get(a.id) ?? 0) ||
         a.name.localeCompare(b.name)
     );
-  }, [me, weekByProject]);
+    const mine = new Set<string>(me?.touched ?? []);
+    for (const t of me?.tasks ?? []) mine.add(t.projectId);
+    if (me?.active) mine.add(me.active.projectId);
+    const myKey = session?.user?.slackId ?? "local";
+    for (const p of list) if (p.createdBy && p.createdBy === myKey) mine.add(p.id);
+    return {
+      mineProjects: list.filter((p) => mine.has(p.id)),
+      otherProjects: list.filter((p) => !mine.has(p.id)),
+    };
+  }, [me, weekByProject, session]);
+  const [showOthers, setShowOthers] = useState(false);
 
   // A task tapped via "Start" — marked as doing once the clock-in succeeds
   // (including after the switch-project confirmation).
@@ -158,7 +170,7 @@ export default function ClockPage() {
   };
 
   const activeProject = me?.active
-    ? projects.find((p) => p.id === me.active!.projectId)
+    ? me.projects.find((p) => p.id === me.active!.projectId)
     : undefined;
   const elapsed = me?.active ? Math.max(0, now - Date.parse(me.active.inAt)) : 0;
 
@@ -287,9 +299,9 @@ export default function ClockPage() {
         </div>
       )}
 
-      {/* Projects */}
+      {/* Projects — mine first; everything else behind a toggle. */}
       <div className="space-y-3 flex-1">
-        {projects.map((p) => {
+        {(showOthers ? [...mineProjects, ...otherProjects] : mineProjects).map((p) => {
           const isActive = me?.active?.projectId === p.id;
           if (isActive) return null;
           const weekMs = weekByProject.get(p.id) ?? 0;
@@ -366,9 +378,24 @@ export default function ClockPage() {
           );
         })}
 
-        {me && projects.length === 0 && (
+        {otherProjects.length > 0 && (
+          <button
+            onClick={() => setShowOthers(!showOthers)}
+            className="w-full text-center text-[12px] text-ink-faint hover:text-ink py-2 transition-colors"
+          >
+            {showOthers ? "Hide other projects" : `Show other projects · ${otherProjects.length}`}
+          </button>
+        )}
+
+        {me && mineProjects.length === 0 && otherProjects.length === 0 && (
           <p className="text-sm text-ink-faint text-center py-10">
             No projects yet — create one in the SuperPixel Assistant first.
+          </p>
+        )}
+        {me && mineProjects.length === 0 && otherProjects.length > 0 && !showOthers && (
+          <p className="text-sm text-ink-faint text-center py-6">
+            No projects assigned to you yet — ask your PM for a task, or pick from other projects
+            above.
           </p>
         )}
       </div>

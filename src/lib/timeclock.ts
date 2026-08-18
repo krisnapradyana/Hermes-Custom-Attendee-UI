@@ -196,6 +196,7 @@ export function deleteSession(
 export function myStatus(userKey: string): Promise<{
   active: { projectId: string; inAt: string } | null;
   week: { projectId: string; ms: number }[];
+  touched: string[];
 }> {
   return withLock(LOCK, async () => {
     const active = await sweep();
@@ -203,6 +204,7 @@ export function myStatus(userKey: string): Promise<{
 
     const from = weekStart();
     const week: { projectId: string; ms: number }[] = [];
+    const touched: string[] = []; // every project this member EVER clocked in
     let files: string[] = [];
     try {
       files = (await fs.readdir(DIR)).filter((f) => f.endsWith(".json") && f !== "active.json");
@@ -210,10 +212,11 @@ export function myStatus(userKey: string): Promise<{
     for (const f of files) {
       const sessions = await readJson<TcSession[]>(path.join(DIR, f), []);
       const mine = sessions.filter((s) => s.userKey === userKey);
+      if (mine.length > 0) touched.push(f.replace(/\.json$/, ""));
       const ms = mine.reduce((acc, s) => acc + overlap(s, from, Date.now()), 0);
       if (ms > 0) week.push({ projectId: f.replace(/\.json$/, ""), ms });
     }
-    return { active: cur ? { projectId: cur.projectId, inAt: cur.inAt } : null, week };
+    return { active: cur ? { projectId: cur.projectId, inAt: cur.inAt } : null, week, touched };
   });
 }
 
