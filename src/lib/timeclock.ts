@@ -263,6 +263,75 @@ export function projectReport(projectId: string): Promise<{
   });
 }
 
+export interface MemberPulse {
+  userKey: string;
+  name: string;
+  active: { projectId: string; inAt: string } | null;
+  todayMs: number;
+  weekMs: number;
+  lastSeen: string | null; // ISO — latest activity ever (null = never clocked)
+  weekByProject: { projectId: string; ms: number }[];
+}
+
+/**
+ * Whole-team snapshot for the PM's Team Pulse page: who is working right
+ * now (and on what, since when), who is idle, and everyone's hours today
+ * and this week. One pass over all project files.
+ */
+export function overview(): Promise<MemberPulse[]> {
+  return withLock(LOCK, async () => {
+    const active = await sweep();
+    const dFrom = dayStart();
+    const wFrom = weekStart();
+    const now = Date.now();
+
+    const members = new Map<string, MemberPulse>();
+    let files: string[] = [];
+    try {
+      files = (await fs.readdir(DIR)).filter((f) => f.endsWith(".json") && f !== "active.json");
+    } catch {}
+
+    for (const f of files) {
+      const projectId = f.replace(/\.json$/, "");
+      const sessions = await readJson<TcSession[]>(path.join(DIR, f), []);
+      for (const s of sessions) {
+        const m = members.get(s.userKey) ?? {
+          userKey: s.userKey,
+          name: s.name,
+          active: null,
+          todayMs: 0,
+          weekMs: 0,
+          lastSeen: null,
+          weekByProject: [],
+        };
+        m.name = s.name; // latest name wins
+        m.todayMs += overlap(s, dFrom, now);
+        const w = overlap(s, wFrom, now);
+        m.weekMs += w;
+        if (w > 0) {
+          const entry = m.weekByProject.find((x) => x.projectId === projectId);
+          if (entry) entry.ms += w;
+          else m.weekByProject.push({ projectId, ms: w });
+        }
+        const seen = s.outAt ?? s.inAt;
+        if (!m.lastSeen || seen > m.lastSeen) m.lastSeen = seen;
+        members.set(s.userKey, m);
+      }
+    }
+
+    for (const [userKey, a] of Object.entries(active)) {
+      const m = members.get(userKey);
+      if (m) m.active = { projectId: a.projectId, inAt: a.inAt };
+    }
+
+    // Working people first, then most recently seen.
+    return [...members.values()].sort((a, b) => {
+      if (!!a.active !== !!b.active) return a.active ? -1 : 1;
+      return (b.lastSeen ?? "").localeCompare(a.lastSeen ?? "");
+    });
+  });
+}
+
 export function allSessions(projectId: string): Promise<TcSession[]> {
   return withLock(LOCK, async () => {
     await sweep();

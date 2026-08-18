@@ -2,9 +2,19 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSession, signOut } from "next-auth/react";
-import { Clock, LogOut, Play, Square, ArrowLeftRight, FolderKanban } from "lucide-react";
+import {
+  Clock,
+  LogOut,
+  Play,
+  Square,
+  ArrowLeftRight,
+  FolderKanban,
+  ListChecks,
+  CornerDownRight,
+  Send,
+} from "lucide-react";
 import { api } from "@/lib/api";
-import { TcProject } from "@/lib/projects";
+import { TcProject, TcTask } from "@/lib/projects";
 
 /**
  * The clock. One glance = my status, one tap = in or out.
@@ -17,6 +27,7 @@ interface Me {
   active: { projectId: string; inAt: string } | null;
   week: { projectId: string; ms: number }[];
   projects: TcProject[];
+  tasks: TcTask[];
 }
 
 const fmtDur = (ms: number): string => {
@@ -79,6 +90,10 @@ export default function ClockPage() {
     );
   }, [me, weekByProject]);
 
+  // A task tapped via "Start" — marked as doing once the clock-in succeeds
+  // (including after the switch-project confirmation).
+  const [pendingTask, setPendingTask] = useState<TcTask | null>(null);
+
   const clockIn = async (projectId: string, force = false) => {
     if (busy || !me) return;
     setBusy(true);
@@ -93,14 +108,40 @@ export default function ClockPage() {
     if (!res.ok) {
       setMe(prev);
       setError(res.error);
+      setPendingTask(null);
     } else if (res.data.needSwitch) {
       setMe(prev);
       setConfirmSwitch(projectId);
     } else if (res.data.active) {
       setMe({ ...prev, active: res.data.active });
-      load(); // refresh weekly totals
+      if (pendingTask && pendingTask.projectId === projectId) {
+        await api.post("/api/timeclock/task", {
+          projectId,
+          taskId: pendingTask.id,
+          status: "doing",
+        });
+        setPendingTask(null);
+      }
+      load(); // refresh weekly totals + tasks
     }
     setBusy(false);
+  };
+
+  /** Tap a task: clock into its project and mark it doing. */
+  const startTask = (t: TcTask) => {
+    setPendingTask(t);
+    clockIn(t.projectId);
+  };
+
+  /** Hand a doing-task to the PM for review. */
+  const sendToReview = async (t: TcTask) => {
+    const res = await api.post("/api/timeclock/task", {
+      projectId: t.projectId,
+      taskId: t.id,
+      status: "review",
+    });
+    if (!res.ok) setError((res as { error: string }).error);
+    load();
   };
 
   const clockOut = async () => {
@@ -180,6 +221,72 @@ export default function ClockPage() {
         </div>
       )}
 
+      {/* My tasks — assigned in the assistant, actionable here. */}
+      {me && me.tasks.length > 0 && (
+        <div className="mb-6">
+          <h2 className="flex items-center gap-1.5 text-[12px] font-medium uppercase tracking-wide text-ink-faint mb-2.5">
+            <ListChecks size={13} />
+            My tasks · {me.tasks.length}
+          </h2>
+          <div className="space-y-2">
+            {me.tasks.map((t) => {
+              const proj = me.projects.find((p) => p.id === t.projectId);
+              return (
+                <div key={t.id} className="rounded-xl border border-line bg-card px-3.5 py-2.5">
+                  <div className="flex items-center gap-2.5">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[14px] font-medium truncate">{t.title}</p>
+                      <p className="text-[11px] text-ink-faint truncate">
+                        {proj?.name ?? t.projectId}
+                        {t.phase ? ` · ${t.phase}` : ""} ·{" "}
+                        <span
+                          className={
+                            t.status === "revision"
+                              ? "text-red-500"
+                              : t.status === "review"
+                                ? "text-amber-500"
+                                : t.status === "doing"
+                                  ? "text-accent"
+                                  : ""
+                          }
+                        >
+                          {t.status}
+                        </span>
+                      </p>
+                    </div>
+                    {t.status === "doing" ? (
+                      <button
+                        onClick={() => sendToReview(t)}
+                        disabled={busy}
+                        className="flex items-center gap-1.5 rounded-lg border border-line px-3 py-2 text-[12px] text-ink-soft hover:border-ink-faint hover:text-ink disabled:opacity-50 shrink-0"
+                      >
+                        <Send size={12} />
+                        To review
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => startTask(t)}
+                        disabled={busy || t.status === "review"}
+                        className="flex items-center gap-1.5 rounded-lg bg-accent px-3 py-2 text-[12px] text-white hover:bg-accent-hover disabled:opacity-40 shrink-0"
+                      >
+                        <Play size={12} />
+                        Start
+                      </button>
+                    )}
+                  </div>
+                  {t.status === "revision" && t.statusNote && (
+                    <p className="mt-2 flex items-start gap-1.5 text-[12px] text-ink-soft rounded-lg bg-parchment-dark px-2.5 py-1.5">
+                      <CornerDownRight size={11} className="mt-0.5 shrink-0 text-red-500" />
+                      {t.statusNote}
+                    </p>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {/* Projects */}
       <div className="space-y-3 flex-1">
         {projects.map((p) => {
@@ -245,7 +352,10 @@ export default function ClockPage() {
                     Switch
                   </button>
                   <button
-                    onClick={() => setConfirmSwitch(null)}
+                    onClick={() => {
+                      setConfirmSwitch(null);
+                      setPendingTask(null);
+                    }}
                     className="rounded-lg px-2.5 py-1.5 text-[13px] text-ink-soft hover:bg-card"
                   >
                     Cancel
