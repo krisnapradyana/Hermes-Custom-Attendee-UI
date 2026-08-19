@@ -19,9 +19,11 @@ export interface TcTask {
   id: string;
   projectId: string;
   title: string;
+  note?: string;
   phase?: string;
   status: TaskStatus;
   statusNote?: string;
+  dueDate?: string;
   updatedAt: string;
 }
 

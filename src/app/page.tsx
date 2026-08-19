@@ -250,7 +250,14 @@ export default function ClockPage() {
                       <p className="text-[14px] font-medium truncate">{t.title}</p>
                       <p className="text-[11px] text-ink-faint truncate">
                         {proj?.name ?? t.projectId}
-                        {t.phase ? ` · ${t.phase}` : ""} ·{" "}
+                        {t.phase ? ` · ${t.phase}` : ""}
+                        {t.dueDate
+                          ? ` · due ${new Date(`${t.dueDate}T00:00:00`).toLocaleDateString(
+                              undefined,
+                              { day: "numeric", month: "short" }
+                            )}`
+                          : ""}{" "}
+                        ·{" "}
                         <span
                           className={
                             t.status === "revision"
