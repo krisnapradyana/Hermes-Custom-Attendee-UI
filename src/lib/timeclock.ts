@@ -21,6 +21,8 @@ export interface TcSession {
   inAt: string; // ISO UTC
   outAt: string | null;
   autoClosed?: boolean;
+  /** Accumulated break time (ms) — excluded from all duration counts. */
+  breakMs?: number;
 }
 
 export interface MemberAggregate {
@@ -40,7 +42,10 @@ const AUTO_CLOSE_MS = 12 * 3600_000;
 const LOCK = "timeclock";
 const OFFSET_MIN = Number(process.env.TIMECLOCK_TZ_OFFSET_MIN ?? "480");
 
-type ActiveIndex = Record<string, { projectId: string; sessionId: string; inAt: string }>;
+type ActiveIndex = Record<
+  string,
+  { projectId: string; sessionId: string; inAt: string; breakAt?: string }
+>;
 
 const projFile = (projectId: string) =>
   path.join(DIR, `${projectId.replace(/[^\w.-]+/g, "_")}.json`);
@@ -71,8 +76,13 @@ async function sweep(): Promise<ActiveIndex> {
     const sessions = await readJson<TcSession[]>(file, []);
     const s = sessions.find((x) => x.id === a.sessionId);
     if (s && !s.outAt) {
-      s.outAt = new Date(Date.parse(a.inAt) + AUTO_CLOSE_MS).toISOString();
+      const closeAt = Date.parse(a.inAt) + AUTO_CLOSE_MS;
+      s.outAt = new Date(closeAt).toISOString();
       s.autoClosed = true;
+      // A break still open at auto-close: everything since break start is break.
+      if (a.breakAt) {
+        s.breakMs = (s.breakMs ?? 0) + Math.max(0, closeAt - Date.parse(a.breakAt));
+      }
       await writeAtomic(file, sessions);
     }
     delete active[userKey];
@@ -97,12 +107,23 @@ export function weekStart(now = Date.now()): number {
   return (days - dowMon0) * DAY - off;
 }
 
-/** ms of a session that fall inside [from, to). Open sessions count to now. */
-function overlap(s: TcSession, from: number, to: number): number {
+/**
+ * ms of a session inside [from, to). Open sessions count to now. Break time
+ * (accumulated + a live break passed via extraBreakMs) shortens the session
+ * from the end — totals stay exact, and a rare midnight-spanning break only
+ * shifts which day gets the deduction.
+ */
+function overlap(s: TcSession, from: number, to: number, extraBreakMs = 0): number {
+  const end = s.outAt ? Date.parse(s.outAt) : Date.now();
+  const effEnd = end - (s.breakMs ?? 0) - extraBreakMs;
   const a = Math.max(Date.parse(s.inAt), from);
-  const b = Math.min(s.outAt ? Date.parse(s.outAt) : Date.now(), to);
+  const b = Math.min(effEnd, to);
   return Math.max(0, b - a);
 }
+
+/** Live break ms for an open session, if the active entry is on break. */
+const liveBreak = (a?: { sessionId: string; breakAt?: string }, sessionId?: string): number =>
+  a && a.breakAt && a.sessionId === sessionId ? Date.now() - Date.parse(a.breakAt) : 0;
 
 // ---- mutations -------------------------------------------------------------
 
@@ -128,6 +149,9 @@ export function clockIn(user: TcUser, projectId: string, force: boolean): Promis
       const s = sessions.find((x) => x.id === cur.sessionId);
       if (s && !s.outAt) {
         s.outAt = new Date().toISOString();
+        if (cur.breakAt) {
+          s.breakMs = (s.breakMs ?? 0) + Math.max(0, Date.now() - Date.parse(cur.breakAt));
+        }
         await writeAtomic(file, sessions);
       }
     }
@@ -162,12 +186,47 @@ export function clockOut(userKey: string): Promise<{ projectId: string; ms: numb
     let ms = 0;
     if (s && !s.outAt) {
       s.outAt = new Date().toISOString();
-      ms = Date.parse(s.outAt) - Date.parse(s.inAt);
+      if (cur.breakAt) {
+        s.breakMs = (s.breakMs ?? 0) + Math.max(0, Date.now() - Date.parse(cur.breakAt));
+      }
+      ms = Math.max(0, Date.parse(s.outAt) - Date.parse(s.inAt) - (s.breakMs ?? 0));
       await writeAtomic(file, sessions);
     }
     delete active[userKey];
     await writeAtomic(ACTIVE, active);
     return { projectId: cur.projectId, ms };
+  });
+}
+
+/**
+ * Toggle break on the current session. Break time is excluded from every
+ * duration count. Returns the new state, or null if not clocked in.
+ */
+export function toggleBreak(
+  userKey: string
+): Promise<{ onBreak: boolean; breakAt?: string } | null> {
+  return withLock(LOCK, async () => {
+    const active = await sweep();
+    const cur = active[userKey];
+    if (!cur) return null;
+
+    if (cur.breakAt) {
+      // Resume: fold the finished break into the session.
+      const file = projFile(cur.projectId);
+      const sessions = await readJson<TcSession[]>(file, []);
+      const s = sessions.find((x) => x.id === cur.sessionId);
+      if (s && !s.outAt) {
+        s.breakMs = (s.breakMs ?? 0) + Math.max(0, Date.now() - Date.parse(cur.breakAt));
+        await writeAtomic(file, sessions);
+      }
+      delete cur.breakAt;
+      await writeAtomic(ACTIVE, active);
+      return { onBreak: false };
+    }
+
+    cur.breakAt = new Date().toISOString();
+    await writeAtomic(ACTIVE, active);
+    return { onBreak: true, breakAt: cur.breakAt };
   });
 }
 
@@ -194,13 +253,14 @@ export function deleteSession(
 // ---- reads -----------------------------------------------------------------
 
 export function myStatus(userKey: string): Promise<{
-  active: { projectId: string; inAt: string } | null;
+  active: { projectId: string; inAt: string; breakAt?: string; breakMs?: number } | null;
   week: { projectId: string; ms: number }[];
   touched: string[];
 }> {
   return withLock(LOCK, async () => {
     const active = await sweep();
     const cur = active[userKey] ?? null;
+    let curBreakMs = 0; // accumulated (closed) break time of the active session
 
     const from = weekStart();
     const week: { projectId: string; ms: number }[] = [];
@@ -213,10 +273,28 @@ export function myStatus(userKey: string): Promise<{
       const sessions = await readJson<TcSession[]>(path.join(DIR, f), []);
       const mine = sessions.filter((s) => s.userKey === userKey);
       if (mine.length > 0) touched.push(f.replace(/\.json$/, ""));
-      const ms = mine.reduce((acc, s) => acc + overlap(s, from, Date.now()), 0);
+      if (cur) {
+        const cs = mine.find((s) => s.id === cur.sessionId);
+        if (cs) curBreakMs = cs.breakMs ?? 0;
+      }
+      const ms = mine.reduce(
+        (acc, s) => acc + overlap(s, from, Date.now(), liveBreak(cur ?? undefined, s.id)),
+        0
+      );
       if (ms > 0) week.push({ projectId: f.replace(/\.json$/, ""), ms });
     }
-    return { active: cur ? { projectId: cur.projectId, inAt: cur.inAt } : null, week, touched };
+    return {
+      active: cur
+        ? {
+            projectId: cur.projectId,
+            inAt: cur.inAt,
+            breakMs: curBreakMs,
+            ...(cur.breakAt ? { breakAt: cur.breakAt } : {}),
+          }
+        : null,
+      week,
+      touched,
+    };
   });
 }
 
@@ -242,8 +320,9 @@ export function projectReport(projectId: string): Promise<{
         lastSeen: s.inAt,
       };
       m.name = s.name; // latest name wins
-      m.todayMs += overlap(s, dFrom, now);
-      m.weekMs += overlap(s, wFrom, now);
+      const lb = liveBreak(active[s.userKey], s.id);
+      m.todayMs += overlap(s, dFrom, now, lb);
+      m.weekMs += overlap(s, wFrom, now, lb);
       m.sessions += 1;
       const seen = s.outAt ?? s.inAt;
       if (seen > m.lastSeen) m.lastSeen = seen;
@@ -269,7 +348,7 @@ export function projectReport(projectId: string): Promise<{
 export interface MemberPulse {
   userKey: string;
   name: string;
-  active: { projectId: string; inAt: string } | null;
+  active: { projectId: string; inAt: string; breakAt?: string } | null;
   todayMs: number;
   weekMs: number;
   lastSeen: string | null; // ISO — latest activity ever (null = never clocked)
@@ -308,8 +387,9 @@ export function overview(): Promise<MemberPulse[]> {
           weekByProject: [],
         };
         m.name = s.name; // latest name wins
-        m.todayMs += overlap(s, dFrom, now);
-        const w = overlap(s, wFrom, now);
+        const lb = liveBreak(active[s.userKey], s.id);
+        m.todayMs += overlap(s, dFrom, now, lb);
+        const w = overlap(s, wFrom, now, lb);
         m.weekMs += w;
         if (w > 0) {
           const entry = m.weekByProject.find((x) => x.projectId === projectId);
@@ -324,7 +404,12 @@ export function overview(): Promise<MemberPulse[]> {
 
     for (const [userKey, a] of Object.entries(active)) {
       const m = members.get(userKey);
-      if (m) m.active = { projectId: a.projectId, inAt: a.inAt };
+      if (m)
+        m.active = {
+          projectId: a.projectId,
+          inAt: a.inAt,
+          ...(a.breakAt ? { breakAt: a.breakAt } : {}),
+        };
     }
 
     // Working people first, then most recently seen.

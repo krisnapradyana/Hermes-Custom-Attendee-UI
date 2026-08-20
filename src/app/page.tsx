@@ -12,6 +12,9 @@ import {
   ListChecks,
   CornerDownRight,
   Send,
+  Coffee,
+  Search,
+  X,
 } from "lucide-react";
 import { api } from "@/lib/api";
 import { TcProject, TcTask } from "@/lib/projects";
@@ -24,7 +27,7 @@ import { TcProject, TcTask } from "@/lib/projects";
  */
 
 interface Me {
-  active: { projectId: string; inAt: string } | null;
+  active: { projectId: string; inAt: string; breakAt?: string; breakMs?: number } | null;
   week: { projectId: string; ms: number }[];
   /** Projects I have ever clocked time in. */
   touched: string[];
@@ -69,12 +72,17 @@ export default function ClockPage() {
 
   useEffect(() => {
     load();
-    // Refresh when the phone comes back to the foreground.
+    // Refresh when the tab/app comes back to the foreground or regains focus.
     const onVisible = () => {
       if (document.visibilityState === "visible") load();
     };
+    const onFocus = () => load();
     document.addEventListener("visibilitychange", onVisible);
-    return () => document.removeEventListener("visibilitychange", onVisible);
+    window.addEventListener("focus", onFocus);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("focus", onFocus);
+    };
   }, [load]);
 
   const weekByProject = useMemo(
@@ -169,10 +177,35 @@ export default function ClockPage() {
     setBusy(false);
   };
 
+  /** Break/Resume — break time is excluded from all totals. */
+  const toggleBreak = async () => {
+    if (busy || !me?.active) return;
+    setBusy(true);
+    const res = await api.post<{ onBreak: boolean; breakAt?: string }>("/api/timeclock/break");
+    if (!res.ok) setError(res.error);
+    await load();
+    setBusy(false);
+  };
+
   const activeProject = me?.active
     ? me.projects.find((p) => p.id === me.active!.projectId)
     : undefined;
-  const elapsed = me?.active ? Math.max(0, now - Date.parse(me.active.inAt)) : 0;
+  const onBreak = !!me?.active?.breakAt;
+  // Timer counts worked time only: wall time minus closed breaks minus the
+  // live break — so it visibly freezes while on break.
+  const elapsed = me?.active
+    ? Math.max(
+        0,
+        now -
+          Date.parse(me.active.inAt) -
+          (me.active.breakMs ?? 0) -
+          (me.active.breakAt ? now - Date.parse(me.active.breakAt) : 0)
+      )
+    : 0;
+
+  // Project search: while typing, match across ALL projects (incl. "others").
+  const [query, setQuery] = useState("");
+  const q = query.trim().toLowerCase();
 
   return (
     <div className="mx-auto max-w-md px-4 py-6 min-h-screen flex flex-col">
@@ -193,11 +226,15 @@ export default function ClockPage() {
         </div>
         {me?.active && (
           <span className="flex items-center gap-1.5 rounded-full border border-line bg-card px-2.5 py-1 text-[11px] text-ink-soft">
-            <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-500 opacity-60" />
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500" />
-            </span>
-            Working
+            {onBreak ? (
+              <span className="inline-flex rounded-full h-2 w-2 bg-amber-500" />
+            ) : (
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-500 opacity-60" />
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500" />
+              </span>
+            )}
+            {onBreak ? "On break" : "Working"}
           </span>
         )}
       </div>
@@ -211,25 +248,53 @@ export default function ClockPage() {
 
       {/* Active session — dominates the screen. */}
       {me?.active && (
-        <div className="mb-5 rounded-2xl border-2 border-accent bg-card p-5 shadow-lg">
+        <div
+          className={`mb-5 rounded-2xl border-2 bg-card p-5 shadow-lg ${
+            onBreak ? "border-amber-500" : "border-accent"
+          }`}
+        >
           <div className="flex items-center gap-2 mb-1">
             <FolderKanban size={15} style={{ color: activeProject?.color }} />
-            <p className="font-medium truncate">{activeProject?.name ?? me.active.projectId}</p>
+            <p className="font-medium truncate flex-1">
+              {activeProject?.name ?? me.active.projectId}
+            </p>
+            {onBreak && (
+              <span className="flex items-center gap-1 text-[12px] text-amber-500 shrink-0">
+                <Coffee size={12} />
+                paused
+              </span>
+            )}
           </div>
           <p
-            className="font-mono text-4xl font-semibold tracking-tight my-3 tabular-nums"
+            className={`font-mono text-4xl font-semibold tracking-tight my-3 tabular-nums ${
+              onBreak ? "text-ink-faint" : ""
+            }`}
             suppressHydrationWarning
           >
             {fmtTimer(elapsed)}
           </p>
-          <button
-            onClick={clockOut}
-            disabled={busy}
-            className="w-full flex items-center justify-center gap-2 rounded-xl bg-accent px-4 py-3.5 text-white font-medium hover:bg-accent-hover disabled:opacity-50 transition-colors"
-          >
-            <Square size={16} />
-            Clock out
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={toggleBreak}
+              disabled={busy}
+              className={`flex-1 flex items-center justify-center gap-2 rounded-xl px-4 py-3.5 font-medium disabled:opacity-50 transition-colors ${
+                onBreak
+                  ? "bg-amber-500 text-white hover:bg-amber-600"
+                  : "border border-line text-ink-soft hover:border-ink-faint hover:text-ink"
+              }`}
+            >
+              {onBreak ? <Play size={16} /> : <Coffee size={16} />}
+              {onBreak ? "Resume" : "Break"}
+            </button>
+            <button
+              onClick={clockOut}
+              disabled={busy}
+              className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-accent px-4 py-3.5 text-white font-medium hover:bg-accent-hover disabled:opacity-50 transition-colors"
+            >
+              <Square size={16} />
+              Clock out
+            </button>
+          </div>
         </div>
       )}
 
@@ -306,9 +371,34 @@ export default function ClockPage() {
         </div>
       )}
 
+      {/* Search — while typing, matches across ALL projects. */}
+      <div className="relative mb-3">
+        <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-faint" />
+        <input
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Search projects…"
+          className="w-full rounded-xl border border-line bg-card pl-9 pr-9 py-2.5 text-[14px] placeholder:text-ink-faint focus:outline-none focus:border-accent"
+        />
+        {query && (
+          <button
+            onClick={() => setQuery("")}
+            className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 text-ink-faint hover:text-ink"
+            title="Clear"
+          >
+            <X size={14} />
+          </button>
+        )}
+      </div>
+
       {/* Projects — mine first; everything else behind a toggle. */}
       <div className="space-y-3 flex-1">
-        {(showOthers ? [...mineProjects, ...otherProjects] : mineProjects).map((p) => {
+        {(q
+          ? [...mineProjects, ...otherProjects].filter((p) => p.name.toLowerCase().includes(q))
+          : showOthers
+            ? [...mineProjects, ...otherProjects]
+            : mineProjects
+        ).map((p) => {
           const isActive = me?.active?.projectId === p.id;
           if (isActive) return null;
           const weekMs = weekByProject.get(p.id) ?? 0;
@@ -385,7 +475,16 @@ export default function ClockPage() {
           );
         })}
 
-        {otherProjects.length > 0 && (
+        {q &&
+          me &&
+          [...mineProjects, ...otherProjects].filter((p) => p.name.toLowerCase().includes(q))
+            .length === 0 && (
+            <p className="text-sm text-ink-faint text-center py-6">
+              No projects match &ldquo;{query.trim()}&rdquo;.
+            </p>
+          )}
+
+        {!q && otherProjects.length > 0 && (
           <button
             onClick={() => setShowOthers(!showOthers)}
             className="w-full text-center text-[12px] text-ink-faint hover:text-ink py-2 transition-colors"
@@ -399,7 +498,7 @@ export default function ClockPage() {
             No projects yet — create one in the SuperPixel Assistant first.
           </p>
         )}
-        {me && mineProjects.length === 0 && otherProjects.length > 0 && !showOthers && (
+        {me && !q && mineProjects.length === 0 && otherProjects.length > 0 && !showOthers && (
           <p className="text-sm text-ink-faint text-center py-6">
             No projects assigned to you yet — ask your PM for a task, or pick from other projects
             above.
