@@ -25,6 +25,12 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     nonce: { name: "attendee.nonce", options: opts },
   },
   callbacks: {
+    /** Workspace lock — see the main app: enforced only when SLACK_TEAM_ID is set. */
+    signIn({ profile }) {
+      const requiredTeam = process.env.SLACK_TEAM_ID;
+      if (!requiredTeam) return true;
+      return (profile?.["https://slack.com/team_id"] as string | undefined) === requiredTeam;
+    },
     jwt({ token, profile }) {
       if (profile) {
         token.slackId =
