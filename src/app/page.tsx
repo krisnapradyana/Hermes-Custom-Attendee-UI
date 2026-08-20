@@ -15,6 +15,8 @@ import {
   Coffee,
   Search,
   X,
+  ChevronDown,
+  ChevronRight,
 } from "lucide-react";
 import { api } from "@/lib/api";
 import { TcProject, TcTask } from "@/lib/projects";
@@ -207,6 +209,68 @@ export default function ClockPage() {
   const [query, setQuery] = useState("");
   const q = query.trim().toLowerCase();
 
+  // Tasks live INSIDE their project card (dropdown), not as a separate list.
+  const [expandedProj, setExpandedProj] = useState<string | null>(null);
+  const tasksFor = (projectId: string) => (me?.tasks ?? []).filter((t) => t.projectId === projectId);
+
+  /** One task row — used inside the active card and expanded project cards. */
+  const taskRow = (t: TcTask) => (
+    <div key={t.id} className="rounded-lg bg-parchment-dark/60 px-3 py-2">
+      <div className="flex items-center gap-2.5">
+        <div className="flex-1 min-w-0">
+          <p className="text-[13.5px] font-medium truncate">{t.title}</p>
+          <p className="text-[11px] text-ink-faint truncate">
+            {t.phase ? `${t.phase} · ` : ""}
+            {t.dueDate
+              ? `due ${new Date(`${t.dueDate}T00:00:00`).toLocaleDateString(undefined, {
+                  day: "numeric",
+                  month: "short",
+                })} · `
+              : ""}
+            <span
+              className={
+                t.status === "revision"
+                  ? "text-red-500"
+                  : t.status === "review"
+                    ? "text-amber-500"
+                    : t.status === "doing"
+                      ? "text-accent"
+                      : ""
+              }
+            >
+              {t.status}
+            </span>
+          </p>
+        </div>
+        {t.status === "doing" ? (
+          <button
+            onClick={() => sendToReview(t)}
+            disabled={busy}
+            className="flex items-center gap-1.5 rounded-lg border border-line px-2.5 py-1.5 text-[12px] text-ink-soft hover:border-ink-faint hover:text-ink disabled:opacity-50 shrink-0"
+          >
+            <Send size={11} />
+            To review
+          </button>
+        ) : (
+          <button
+            onClick={() => startTask(t)}
+            disabled={busy || t.status === "review"}
+            className="flex items-center gap-1.5 rounded-lg bg-accent px-2.5 py-1.5 text-[12px] text-white hover:bg-accent-hover disabled:opacity-40 shrink-0"
+          >
+            <Play size={11} />
+            Start
+          </button>
+        )}
+      </div>
+      {t.status === "revision" && t.statusNote && (
+        <p className="mt-1.5 flex items-start gap-1.5 text-[12px] text-ink-soft">
+          <CornerDownRight size={11} className="mt-0.5 shrink-0 text-red-500" />
+          {t.statusNote}
+        </p>
+      )}
+    </div>
+  );
+
   return (
     <div className="mx-auto max-w-md px-4 py-6 min-h-screen flex flex-col">
       {/* Header */}
@@ -295,79 +359,17 @@ export default function ClockPage() {
               Clock out
             </button>
           </div>
-        </div>
-      )}
 
-      {/* My tasks — assigned in the assistant, actionable here. */}
-      {me && me.tasks.length > 0 && (
-        <div className="mb-6">
-          <h2 className="flex items-center gap-1.5 text-[12px] font-medium uppercase tracking-wide text-ink-faint mb-2.5">
-            <ListChecks size={13} />
-            My tasks · {me.tasks.length}
-          </h2>
-          <div className="space-y-2">
-            {me.tasks.map((t) => {
-              const proj = me.projects.find((p) => p.id === t.projectId);
-              return (
-                <div key={t.id} className="rounded-xl border border-line bg-card px-3.5 py-2.5">
-                  <div className="flex items-center gap-2.5">
-                    <div className="flex-1 min-w-0">
-                      <p className="text-[14px] font-medium truncate">{t.title}</p>
-                      <p className="text-[11px] text-ink-faint truncate">
-                        {proj?.name ?? t.projectId}
-                        {t.phase ? ` · ${t.phase}` : ""}
-                        {t.dueDate
-                          ? ` · due ${new Date(`${t.dueDate}T00:00:00`).toLocaleDateString(
-                              undefined,
-                              { day: "numeric", month: "short" }
-                            )}`
-                          : ""}{" "}
-                        ·{" "}
-                        <span
-                          className={
-                            t.status === "revision"
-                              ? "text-red-500"
-                              : t.status === "review"
-                                ? "text-amber-500"
-                                : t.status === "doing"
-                                  ? "text-accent"
-                                  : ""
-                          }
-                        >
-                          {t.status}
-                        </span>
-                      </p>
-                    </div>
-                    {t.status === "doing" ? (
-                      <button
-                        onClick={() => sendToReview(t)}
-                        disabled={busy}
-                        className="flex items-center gap-1.5 rounded-lg border border-line px-3 py-2 text-[12px] text-ink-soft hover:border-ink-faint hover:text-ink disabled:opacity-50 shrink-0"
-                      >
-                        <Send size={12} />
-                        To review
-                      </button>
-                    ) : (
-                      <button
-                        onClick={() => startTask(t)}
-                        disabled={busy || t.status === "review"}
-                        className="flex items-center gap-1.5 rounded-lg bg-accent px-3 py-2 text-[12px] text-white hover:bg-accent-hover disabled:opacity-40 shrink-0"
-                      >
-                        <Play size={12} />
-                        Start
-                      </button>
-                    )}
-                  </div>
-                  {t.status === "revision" && t.statusNote && (
-                    <p className="mt-2 flex items-start gap-1.5 text-[12px] text-ink-soft rounded-lg bg-parchment-dark px-2.5 py-1.5">
-                      <CornerDownRight size={11} className="mt-0.5 shrink-0 text-red-500" />
-                      {t.statusNote}
-                    </p>
-                  )}
-                </div>
-              );
-            })}
-          </div>
+          {/* Tasks on the project I'm clocked into — right where I work. */}
+          {tasksFor(me.active.projectId).length > 0 && (
+            <div className="mt-4 pt-3 border-t border-line">
+              <p className="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wide text-ink-faint mb-2">
+                <ListChecks size={11} />
+                My tasks here · {tasksFor(me.active.projectId).length}
+              </p>
+              <div className="space-y-1.5">{tasksFor(me.active.projectId).map(taskRow)}</div>
+            </div>
+          )}
         </div>
       )}
 
@@ -403,6 +405,8 @@ export default function ClockPage() {
           if (isActive) return null;
           const weekMs = weekByProject.get(p.id) ?? 0;
           const confirming = confirmSwitch === p.id;
+          const tasks = tasksFor(p.id);
+          const isOpen = expandedProj === p.id;
 
           return (
             <div
@@ -418,9 +422,24 @@ export default function ClockPage() {
                 >
                   <FolderKanban size={14} style={{ color: p.color }} />
                 </div>
-                <div className="flex-1 min-w-0">
-                  <p className="font-medium text-[15px] truncate">{p.name}</p>
+                <div
+                  className={`flex-1 min-w-0 ${tasks.length > 0 ? "cursor-pointer select-none" : ""}`}
+                  onClick={() => tasks.length > 0 && setExpandedProj(isOpen ? null : p.id)}
+                  title={tasks.length > 0 ? "Show my tasks in this project" : undefined}
+                >
+                  <p className="font-medium text-[15px] truncate flex items-center gap-1">
+                    {p.name}
+                    {tasks.length > 0 &&
+                      (isOpen ? (
+                        <ChevronDown size={13} className="text-ink-faint shrink-0" />
+                      ) : (
+                        <ChevronRight size={13} className="text-ink-faint shrink-0" />
+                      ))}
+                  </p>
                   <p className="text-[12px] text-ink-faint">
+                    {tasks.length > 0
+                      ? `${tasks.length} task${tasks.length > 1 ? "s" : ""} · `
+                      : ""}
                     {weekMs > 0 ? `${fmtDur(weekMs)} this week` : "No time this week"}
                   </p>
                 </div>
@@ -470,6 +489,11 @@ export default function ClockPage() {
                     Cancel
                   </button>
                 </div>
+              )}
+
+              {/* Tasks live inside the project card — tap the name to open. */}
+              {isOpen && tasks.length > 0 && (
+                <div className="mt-3 space-y-1.5">{tasks.map(taskRow)}</div>
               )}
             </div>
           );
