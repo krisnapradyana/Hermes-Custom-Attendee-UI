@@ -116,7 +116,15 @@ export default function ClockPage() {
   // (including after the switch-project confirmation).
   const [pendingTask, setPendingTask] = useState<TcTask | null>(null);
 
-  const clockIn = async (projectId: string, force = false) => {
+  /**
+   * @param task the task to mark "doing" once the clock-in succeeds.
+   * Passed EXPLICITLY (defaulting to pendingTask state) because startTask
+   * calls clockIn in the same tick it sets the state — reading only the
+   * state here meant the closure still saw null and the task was never
+   * marked doing. The state remains for the switch-confirm flow, where the
+   * confirmation tap happens on a later render.
+   */
+  const clockIn = async (projectId: string, force = false, task: TcTask | null = pendingTask) => {
     if (busy || !me) return;
     setBusy(true);
     setConfirmSwitch(null);
@@ -136,12 +144,13 @@ export default function ClockPage() {
       setConfirmSwitch(projectId);
     } else if (res.data.active) {
       setMe({ ...prev, active: res.data.active });
-      if (pendingTask && pendingTask.projectId === projectId) {
-        await api.post("/api/timeclock/task", {
+      if (task && task.projectId === projectId) {
+        const marked = await api.post("/api/timeclock/task", {
           projectId,
-          taskId: pendingTask.id,
+          taskId: task.id,
           status: "doing",
         });
+        if (!marked.ok) setError(`Clocked in, but couldn't mark the task: ${marked.error}`);
         setPendingTask(null);
       }
       load(); // refresh weekly totals + tasks
@@ -149,10 +158,10 @@ export default function ClockPage() {
     setBusy(false);
   };
 
-  /** Tap a task: clock into its project and mark it doing. */
+  /** Tap a task: clock into its project and mark it doing — one action. */
   const startTask = (t: TcTask) => {
-    setPendingTask(t);
-    clockIn(t.projectId);
+    setPendingTask(t); // kept for the switch-confirm flow
+    clockIn(t.projectId, false, t);
   };
 
   /** Hand a doing-task to the PM for review. */
