@@ -329,7 +329,7 @@ export default function ClockPage() {
           <div className="flex items-center gap-2 mb-1">
             <FolderKanban size={15} style={{ color: activeProject?.color }} />
             <p className="font-medium truncate flex-1">
-              {activeProject?.name ?? me.active.projectId}
+              {activeProject?.name ?? "Deleted project — clock out"}
             </p>
             {onBreak && (
               <span className="flex items-center gap-1 text-[12px] text-amber-500 shrink-0">
