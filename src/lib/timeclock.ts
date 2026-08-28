@@ -30,6 +30,8 @@ export interface MemberAggregate {
   name: string;
   todayMs: number;
   weekMs: number;
+  /** All-time worked ms on this project (breaks excluded). */
+  totalMs: number;
   sessions: number;
   lastSeen: string; // ISO — latest inAt/outAt
   activeSince?: string; // set when clocked in right now
@@ -316,6 +318,7 @@ export function projectReport(projectId: string): Promise<{
         name: s.name,
         todayMs: 0,
         weekMs: 0,
+        totalMs: 0,
         sessions: 0,
         lastSeen: s.inAt,
       };
@@ -323,6 +326,7 @@ export function projectReport(projectId: string): Promise<{
       const lb = liveBreak(active[s.userKey], s.id);
       m.todayMs += overlap(s, dFrom, now, lb);
       m.weekMs += overlap(s, wFrom, now, lb);
+      m.totalMs += overlap(s, 0, now, lb);
       m.sessions += 1;
       const seen = s.outAt ?? s.inAt;
       if (seen > m.lastSeen) m.lastSeen = seen;
