@@ -424,6 +424,76 @@ export function overview(): Promise<MemberPulse[]> {
   });
 }
 
+export interface DayAttendance {
+  date: string; // YYYY-MM-DD in studio time
+  members: { userKey: string; name: string; ms: number; projects: string[] }[];
+}
+
+/**
+ * Per-day attendance for the last N studio days (today first): who worked,
+ * for how long (breaks excluded), on which projects. Feeds the agent's
+ * TEAM-STATUS attendance section so "who was active last Friday" is
+ * answerable from a file.
+ */
+export function dailyAttendance(days = 30): Promise<DayAttendance[]> {
+  return withLock(LOCK, async () => {
+    const active = await sweep();
+    const todayStart = dayStart();
+    let files: string[] = [];
+    try {
+      files = (await fs.readdir(DIR)).filter((f) => f.endsWith(".json") && f !== "active.json");
+    } catch {}
+
+    const buckets = new Map<
+      number,
+      Map<string, { name: string; ms: number; projects: Set<string> }>
+    >();
+    for (const f of files) {
+      const projectId = f.replace(/\.json$/, "");
+      const sessions = await readJson<TcSession[]>(path.join(DIR, f), []);
+      for (const s of sessions) {
+        const lb = liveBreak(active[s.userKey], s.id);
+        const sIn = Date.parse(s.inAt);
+        const sEnd = s.outAt ? Date.parse(s.outAt) : Date.now();
+        for (let i = 0; i < days; i++) {
+          const from = todayStart - i * DAY;
+          if (sIn > from + DAY || sEnd < from) continue; // outside this day
+          const ms = overlap(s, from, from + DAY, lb);
+          if (ms <= 0) continue;
+          const day = buckets.get(i) ?? new Map();
+          const e = day.get(s.userKey) ?? { name: s.name, ms: 0, projects: new Set<string>() };
+          e.ms += ms;
+          e.name = s.name;
+          e.projects.add(projectId);
+          day.set(s.userKey, e);
+          buckets.set(i, day);
+        }
+      }
+    }
+
+    const out: DayAttendance[] = [];
+    for (let i = 0; i < days; i++) {
+      const from = todayStart - i * DAY;
+      const date = new Date(from + off).toISOString().slice(0, 10);
+      const day = buckets.get(i);
+      out.push({
+        date,
+        members: day
+          ? [...day.entries()]
+              .map(([userKey, e]) => ({
+                userKey,
+                name: e.name,
+                ms: e.ms,
+                projects: [...e.projects],
+              }))
+              .sort((a, b) => b.ms - a.ms)
+          : [],
+      });
+    }
+    return out;
+  });
+}
+
 export function allSessions(projectId: string): Promise<TcSession[]> {
   return withLock(LOCK, async () => {
     await sweep();
