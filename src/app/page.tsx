@@ -31,6 +31,7 @@ import { TcProject, TcTask } from "@/lib/projects";
 interface Me {
   active: { projectId: string; inAt: string; breakAt?: string; breakMs?: number } | null;
   week: { projectId: string; ms: number }[];
+  today: { projectId: string; ms: number }[];
   /** Projects I have ever clocked time in. */
   touched: string[];
   projects: TcProject[];
@@ -64,10 +65,15 @@ export default function ClockPage() {
     return () => clearInterval(t);
   }, []);
 
+  // When the totals were fetched — lets the "today" numbers tick live between
+  // refreshes while working (they freeze on break; every break toggle reloads).
+  const [fetchedAt, setFetchedAt] = useState(() => Date.now());
+
   const load = useCallback(async () => {
     const res = await api.get<Me>("/api/timeclock/me");
     if (res.ok) {
       setMe(res.data);
+      setFetchedAt(Date.now());
       setError("");
     } else setError(res.error);
   }, []);
@@ -89,6 +95,10 @@ export default function ClockPage() {
 
   const weekByProject = useMemo(
     () => new Map((me?.week ?? []).map((w) => [w.projectId, w.ms])),
+    [me]
+  );
+  const todayByProject = useMemo(
+    () => new Map((me?.today ?? []).map((t) => [t.projectId, t.ms])),
     [me]
   );
 
@@ -214,6 +224,15 @@ export default function ClockPage() {
       )
     : 0;
 
+  // Today's totals: what the API measured at fetch time, plus the seconds
+  // worked since (only while actively working — a break freezes them).
+  const liveExtra = me?.active && !onBreak ? Math.max(0, now - fetchedAt) : 0;
+  const todayTotal =
+    (me?.today ?? []).reduce((acc, t) => acc + t.ms, 0) + liveExtra;
+  const activeProjToday = me?.active
+    ? ((me.today ?? []).find((t) => t.projectId === me.active!.projectId)?.ms ?? 0) + liveExtra
+    : 0;
+
   // Project search: while typing, match across ALL projects (incl. "others").
   const [query, setQuery] = useState("");
   const q = query.trim().toLowerCase();
@@ -295,6 +314,12 @@ export default function ClockPage() {
               minute: "2-digit",
               second: "2-digit",
             })}
+            {todayTotal > 0 && (
+              <>
+                {" · "}
+                <span className="text-ink-soft font-medium">{fmtDur(todayTotal)} today</span>
+              </>
+            )}
           </p>
         </div>
         {me?.active && (
@@ -345,6 +370,13 @@ export default function ClockPage() {
             suppressHydrationWarning
           >
             {fmtTimer(elapsed)}
+          </p>
+          {/* Daily proof: the session timer above restarts on every switch,
+              but these totals only ever grow through the day. */}
+          <p className="mb-3 text-[12.5px] text-ink-soft" suppressHydrationWarning>
+            This project today <span className="font-medium text-ink">{fmtDur(activeProjToday)}</span>
+            <span className="text-ink-faint"> · all projects today </span>
+            <span className="font-medium text-ink">{fmtDur(todayTotal)}</span>
           </p>
           <div className="flex gap-2">
             <button
@@ -448,6 +480,9 @@ export default function ClockPage() {
                   <p className="text-[12px] text-ink-faint">
                     {tasks.length > 0
                       ? `${tasks.length} task${tasks.length > 1 ? "s" : ""} · `
+                      : ""}
+                    {(todayByProject.get(p.id) ?? 0) > 0
+                      ? `${fmtDur(todayByProject.get(p.id)!)} today · `
                       : ""}
                     {weekMs > 0 ? `${fmtDur(weekMs)} this week` : "No time this week"}
                   </p>

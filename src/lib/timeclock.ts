@@ -257,6 +257,7 @@ export function deleteSession(
 export function myStatus(userKey: string): Promise<{
   active: { projectId: string; inAt: string; breakAt?: string; breakMs?: number } | null;
   week: { projectId: string; ms: number }[];
+  today: { projectId: string; ms: number }[];
   touched: string[];
 }> {
   return withLock(LOCK, async () => {
@@ -265,16 +266,19 @@ export function myStatus(userKey: string): Promise<{
     let curBreakMs = 0; // accumulated (closed) break time of the active session
 
     const from = weekStart();
+    const dFrom = dayStart();
     const week: { projectId: string; ms: number }[] = [];
+    const today: { projectId: string; ms: number }[] = [];
     const touched: string[] = []; // every project this member EVER clocked in
     let files: string[] = [];
     try {
       files = (await fs.readdir(DIR)).filter((f) => f.endsWith(".json") && f !== "active.json");
     } catch {}
     for (const f of files) {
+      const projectId = f.replace(/\.json$/, "");
       const sessions = await readJson<TcSession[]>(path.join(DIR, f), []);
       const mine = sessions.filter((s) => s.userKey === userKey);
-      if (mine.length > 0) touched.push(f.replace(/\.json$/, ""));
+      if (mine.length > 0) touched.push(projectId);
       if (cur) {
         const cs = mine.find((s) => s.id === cur.sessionId);
         if (cs) curBreakMs = cs.breakMs ?? 0;
@@ -283,7 +287,14 @@ export function myStatus(userKey: string): Promise<{
         (acc, s) => acc + overlap(s, from, Date.now(), liveBreak(cur ?? undefined, s.id)),
         0
       );
-      if (ms > 0) week.push({ projectId: f.replace(/\.json$/, ""), ms });
+      if (ms > 0) week.push({ projectId, ms });
+      // Today's worked time per project — sessions accumulate across clock-ins,
+      // so switching away and back never resets a project's daily total.
+      const dms = mine.reduce(
+        (acc, s) => acc + overlap(s, dFrom, Date.now(), liveBreak(cur ?? undefined, s.id)),
+        0
+      );
+      if (dms > 0) today.push({ projectId, ms: dms });
     }
     return {
       active: cur
@@ -295,6 +306,7 @@ export function myStatus(userKey: string): Promise<{
           }
         : null,
       week,
+      today,
       touched,
     };
   });
