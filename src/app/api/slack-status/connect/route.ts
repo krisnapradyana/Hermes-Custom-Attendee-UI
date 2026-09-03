@@ -17,7 +17,11 @@ export async function GET(req: NextRequest) {
   if (!clientId) {
     return NextResponse.json({ error: "Slack app not configured" }, { status: 500 });
   }
-  const base = (process.env.AUTH_URL ?? req.nextUrl.origin).replace(/\/$/, "");
+  // AUTH_URL may include next-auth's /api/auth basepath — strip it, we need
+  // the SITE base (the bug that sent Slack to /api/auth/api/slack-status/…).
+  const base = (process.env.AUTH_URL ?? req.nextUrl.origin)
+    .replace(/\/api\/auth\/?$/, "")
+    .replace(/\/$/, "");
   const state = randomBytes(16).toString("hex");
 
   const url = new URL("https://slack.com/oauth/v2/authorize");

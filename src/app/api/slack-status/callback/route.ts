@@ -13,7 +13,10 @@ export async function GET(req: NextRequest) {
   const gate = await requireUser();
   if (gate.denied) return gate.denied;
 
-  const base = (process.env.AUTH_URL ?? req.nextUrl.origin).replace(/\/$/, "");
+  // Same base derivation as /connect — redirect_uri must match EXACTLY.
+  const base = (process.env.AUTH_URL ?? req.nextUrl.origin)
+    .replace(/\/api\/auth\/?$/, "")
+    .replace(/\/$/, "");
   const back = (q: string) => NextResponse.redirect(`${base}/?slack=${q}`);
 
   const code = req.nextUrl.searchParams.get("code");
