@@ -212,17 +212,6 @@ export default function ClockPage() {
     ? me.projects.find((p) => p.id === me.active!.projectId)
     : undefined;
   const onBreak = !!me?.active?.breakAt;
-  // Timer counts worked time only: wall time minus closed breaks minus the
-  // live break — so it visibly freezes while on break.
-  const elapsed = me?.active
-    ? Math.max(
-        0,
-        now -
-          Date.parse(me.active.inAt) -
-          (me.active.breakMs ?? 0) -
-          (me.active.breakAt ? now - Date.parse(me.active.breakAt) : 0)
-      )
-    : 0;
 
   // Today's totals: what the API measured at fetch time, plus the seconds
   // worked since (only while actively working — a break freezes them).
@@ -363,20 +352,30 @@ export default function ClockPage() {
               </span>
             )}
           </div>
+          {/* Main clock = the whole day, so switching projects never "resets"
+              anything visible. The accent sub-clock is this project's day
+              total — it keeps growing when you come back after a switch. */}
+          <p className="mt-2 text-[10.5px] font-medium uppercase tracking-wide text-ink-faint">
+            Today · all projects
+          </p>
           <p
-            className={`font-mono text-4xl font-semibold tracking-tight my-3 tabular-nums ${
+            className={`font-mono text-4xl font-semibold tracking-tight mt-0.5 tabular-nums ${
               onBreak ? "text-ink-faint" : ""
             }`}
             suppressHydrationWarning
           >
-            {fmtTimer(elapsed)}
+            {fmtTimer(todayTotal)}
           </p>
-          {/* Daily proof: the session timer above restarts on every switch,
-              but these totals only ever grow through the day. */}
-          <p className="mb-3 text-[12.5px] text-ink-soft" suppressHydrationWarning>
-            This project today <span className="font-medium text-ink">{fmtDur(activeProjToday)}</span>
-            <span className="text-ink-faint"> · all projects today </span>
-            <span className="font-medium text-ink">{fmtDur(todayTotal)}</span>
+          <p className="mt-2 text-[10.5px] font-medium uppercase tracking-wide text-ink-faint">
+            This project
+          </p>
+          <p
+            className={`font-mono text-[22px] font-semibold tracking-tight mt-0.5 mb-3 tabular-nums ${
+              onBreak ? "text-ink-faint" : "text-accent"
+            }`}
+            suppressHydrationWarning
+          >
+            {fmtTimer(activeProjToday)}
           </p>
           <div className="flex gap-2">
             <button
