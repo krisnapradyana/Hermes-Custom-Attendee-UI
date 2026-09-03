@@ -369,6 +369,10 @@ export interface MemberPulse {
   weekMs: number;
   lastSeen: string | null; // ISO — latest activity ever (null = never clocked)
   weekByProject: { projectId: string; ms: number }[];
+  todayByProject: { projectId: string; ms: number }[];
+  /** All-time man-hours per project (live session included) — the brief's
+   * "Individual project hours": SUM(duration) by user+project. */
+  totalByProject: { projectId: string; ms: number }[];
 }
 
 /**
@@ -401,17 +405,24 @@ export function overview(): Promise<MemberPulse[]> {
           weekMs: 0,
           lastSeen: null,
           weekByProject: [],
+          todayByProject: [],
+          totalByProject: [],
         };
         m.name = s.name; // latest name wins
         const lb = liveBreak(active[s.userKey], s.id);
-        m.todayMs += overlap(s, dFrom, now, lb);
+        const bump = (list: { projectId: string; ms: number }[], ms: number) => {
+          if (ms <= 0) return;
+          const entry = list.find((x) => x.projectId === projectId);
+          if (entry) entry.ms += ms;
+          else list.push({ projectId, ms });
+        };
+        const d = overlap(s, dFrom, now, lb);
+        m.todayMs += d;
+        bump(m.todayByProject, d);
         const w = overlap(s, wFrom, now, lb);
         m.weekMs += w;
-        if (w > 0) {
-          const entry = m.weekByProject.find((x) => x.projectId === projectId);
-          if (entry) entry.ms += w;
-          else m.weekByProject.push({ projectId, ms: w });
-        }
+        bump(m.weekByProject, w);
+        bump(m.totalByProject, overlap(s, 0, now, lb));
         const seen = s.outAt ?? s.inAt;
         if (!m.lastSeen || seen > m.lastSeen) m.lastSeen = seen;
         members.set(s.userKey, m);
