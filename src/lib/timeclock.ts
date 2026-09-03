@@ -206,7 +206,7 @@ export function clockOut(userKey: string): Promise<{ projectId: string; ms: numb
  */
 export function toggleBreak(
   userKey: string
-): Promise<{ onBreak: boolean; breakAt?: string } | null> {
+): Promise<{ onBreak: boolean; breakAt?: string; projectId?: string } | null> {
   return withLock(LOCK, async () => {
     const active = await sweep();
     const cur = active[userKey];
@@ -223,12 +223,12 @@ export function toggleBreak(
       }
       delete cur.breakAt;
       await writeAtomic(ACTIVE, active);
-      return { onBreak: false };
+      return { onBreak: false, projectId: cur.projectId };
     }
 
     cur.breakAt = new Date().toISOString();
     await writeAtomic(ACTIVE, active);
-    return { onBreak: true, breakAt: cur.breakAt };
+    return { onBreak: true, breakAt: cur.breakAt, projectId: cur.projectId };
   });
 }
 

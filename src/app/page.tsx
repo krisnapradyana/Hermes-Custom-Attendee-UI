@@ -69,6 +69,26 @@ export default function ClockPage() {
   // refreshes while working (they freeze on break; every break toggle reloads).
   const [fetchedAt, setFetchedAt] = useState(() => Date.now());
 
+  // Slack status sync (opt-in): null = unknown, else connected or not.
+  const [slackSync, setSlackSync] = useState<boolean | null>(null);
+  useEffect(() => {
+    api.get<{ connected: boolean }>("/api/slack-status").then((res) => {
+      if (res.ok) setSlackSync(res.data.connected);
+    });
+    // Feedback after the OAuth round-trip (?slack=connected|error|mismatch).
+    const q = new URLSearchParams(window.location.search).get("slack");
+    if (q === "connected") setSlackSync(true);
+    else if (q === "mismatch")
+      setError("That Slack account doesn't match the one you're signed in with.");
+    else if (q === "error") setError("Slack connection failed — try again.");
+    if (q) window.history.replaceState(null, "", window.location.pathname);
+  }, []);
+
+  const stopSlackSync = async () => {
+    await api.del("/api/slack-status");
+    setSlackSync(false);
+  };
+
   const load = useCallback(async () => {
     const res = await api.get<Me>("/api/timeclock/me");
     if (res.ok) {
@@ -229,6 +249,18 @@ export default function ClockPage() {
   // Tasks live INSIDE their project card (dropdown), not as a separate list.
   const [expandedProj, setExpandedProj] = useState<string | null>(null);
   const tasksFor = (projectId: string) => (me?.tasks ?? []).filter((t) => t.projectId === projectId);
+
+  /** Tiny Slack mark for the sync banner. */
+  function SlackGlyph() {
+    return (
+      <svg width="14" height="14" viewBox="0 0 122.8 122.8" aria-hidden className="shrink-0 text-ink-faint">
+        <path d="M25.8 77.6c0 7.1-5.8 12.9-12.9 12.9S0 84.7 0 77.6s5.8-12.9 12.9-12.9h12.9v12.9zm6.5 0c0-7.1 5.8-12.9 12.9-12.9s12.9 5.8 12.9 12.9v32.3c0 7.1-5.8 12.9-12.9 12.9s-12.9-5.8-12.9-12.9V77.6z" fill="currentColor" />
+        <path d="M45.2 25.8c-7.1 0-12.9-5.8-12.9-12.9S38.1 0 45.2 0s12.9 5.8 12.9 12.9v12.9H45.2zm0 6.5c7.1 0 12.9 5.8 12.9 12.9s-5.8 12.9-12.9 12.9H12.9C5.8 58.1 0 52.3 0 45.2s5.8-12.9 12.9-12.9h32.3z" fill="currentColor" />
+        <path d="M97 45.2c0-7.1 5.8-12.9 12.9-12.9s12.9 5.8 12.9 12.9-5.8 12.9-12.9 12.9H97V45.2zm-6.5 0c0 7.1-5.8 12.9-12.9 12.9s-12.9-5.8-12.9-12.9V12.9C64.7 5.8 70.5 0 77.6 0s12.9 5.8 12.9 12.9v32.3z" fill="currentColor" />
+        <path d="M77.6 97c7.1 0 12.9 5.8 12.9 12.9s-5.8 12.9-12.9 12.9-12.9-5.8-12.9-12.9V97h12.9zm0-6.5c-7.1 0-12.9-5.8-12.9-12.9s5.8-12.9 12.9-12.9h32.3c7.1 0 12.9 5.8 12.9 12.9s-5.8 12.9-12.9 12.9H77.6z" fill="currentColor" />
+      </svg>
+    );
+  }
 
   /** One task row — used inside the active card and expanded project cards. */
   const taskRow = (t: TcTask) => (
@@ -573,8 +605,37 @@ export default function ClockPage() {
         )}
       </div>
 
+      {/* Slack status sync — one-time opt-in, then automatic. */}
+      {slackSync !== null && (
+        <div className="mt-6 flex items-center gap-2 rounded-xl border border-line bg-card px-3.5 py-2.5 text-[12.5px]">
+          <SlackGlyph />
+          {slackSync ? (
+            <>
+              <span className="text-ink-soft">
+                Slack status syncs with your clock (🎬 working · ☕ break).
+              </span>
+              <span className="flex-1" />
+              <button onClick={stopSlackSync} className="text-ink-faint hover:text-red-500 shrink-0">
+                Stop
+              </button>
+            </>
+          ) : (
+            <>
+              <span className="text-ink-soft">Set my Slack status automatically when I clock in.</span>
+              <span className="flex-1" />
+              <a
+                href="/api/slack-status/connect"
+                className="rounded-lg bg-accent px-3 py-1.5 text-[12px] text-white hover:bg-accent-hover shrink-0"
+              >
+                Connect
+              </a>
+            </>
+          )}
+        </div>
+      )}
+
       {/* Footer */}
-      <div className="mt-8 flex items-center justify-between text-[12px] text-ink-faint">
+      <div className="mt-4 flex items-center justify-between text-[12px] text-ink-faint">
         <span className="truncate">{session?.user?.name ?? ""}</span>
         {process.env.NEXT_PUBLIC_AUTH_ENABLED === "true" && (
           <button
