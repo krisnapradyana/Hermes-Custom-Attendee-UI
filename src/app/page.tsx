@@ -349,20 +349,22 @@ export default function ClockPage() {
             )}
           </p>
         </div>
-        {me?.active && (
-          <span className="flex items-center gap-1.5 rounded-full border border-line bg-card px-2.5 py-1 text-[11px] text-ink-soft">
-            {onBreak ? (
-              <span className="inline-flex rounded-full h-2 w-2 bg-amber-500" />
-            ) : onStandby ? (
-              <span className="inline-flex rounded-full h-2 w-2 bg-violet-500" />
-            ) : (
-              <span className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-500 opacity-60" />
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500" />
-              </span>
-            )}
-            {onBreak ? "On break" : onStandby ? "Standby" : "Working"}
-          </span>
+        {/* One-tap standby, always at hand — works clocked out AND mid-work
+            (silent switch; the active card already shows the current state). */}
+        {me && (
+          <button
+            onClick={() => !onStandby && clockIn(STANDBY_ID, true)}
+            disabled={busy || onStandby}
+            className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[12px] font-medium shrink-0 transition-colors ${
+              onStandby
+                ? "bg-violet-500 text-white cursor-default"
+                : "border border-violet-500/60 text-violet-500 hover:bg-violet-500/10"
+            } disabled:opacity-70`}
+            title={onStandby ? "You are on standby" : "Present but not on a project"}
+          >
+            <Armchair size={13} />
+            {onStandby ? "On standby" : "Standby"}
+          </button>
         )}
       </div>
 
@@ -372,22 +374,6 @@ export default function ClockPage() {
         </p>
       )}
       {!me && !error && <p className="text-sm text-ink-faint py-10 text-center">Loading…</p>}
-
-      {/* Standby strip — presence without a project. NOT a project card, so
-          it lives up here with the header, only while clocked out. */}
-      {me && !me.active && (
-        <div className="mb-4 flex items-center gap-2.5 rounded-xl border border-dashed border-violet-500/50 bg-violet-500/5 px-3 py-2.5">
-          <Armchair size={15} className="text-violet-500 shrink-0" />
-          <p className="flex-1 text-[12.5px] text-ink-soft">Present but no project yet?</p>
-          <button
-            onClick={() => clockIn(STANDBY_ID)}
-            disabled={busy}
-            className="rounded-lg border border-violet-500/60 px-3 py-1.5 text-[12.5px] font-medium text-violet-500 hover:bg-violet-500/10 disabled:opacity-50 shrink-0"
-          >
-            Go on standby
-          </button>
-        </div>
-      )}
 
       {/* Active session — dominates the screen. */}
       {me?.active && (
