@@ -17,9 +17,13 @@ import {
   X,
   ChevronDown,
   ChevronRight,
+  Armchair,
 } from "lucide-react";
 import { api } from "@/lib/api";
 import { TcProject, TcTask } from "@/lib/projects";
+
+/** Pseudo-project id for "present, no project" — see lib/timeclock.ts. */
+const STANDBY_ID = "standby";
 
 /**
  * The clock. One glance = my status, one tap = in or out.
@@ -188,10 +192,11 @@ export default function ClockPage() {
     setBusy(false);
   };
 
-  /** Tap a task: clock into its project and mark it doing — one action. */
+  /** Tap a task: clock into its project and mark it doing — one action.
+   * From standby the switch is silent (no work being abandoned). */
   const startTask = (t: TcTask) => {
     setPendingTask(t); // kept for the switch-confirm flow
-    clockIn(t.projectId, false, t);
+    clockIn(t.projectId, me?.active?.projectId === STANDBY_ID, t);
   };
 
   /** Hand a doing-task to the PM for review. */
@@ -232,6 +237,7 @@ export default function ClockPage() {
     ? me.projects.find((p) => p.id === me.active!.projectId)
     : undefined;
   const onBreak = !!me?.active?.breakAt;
+  const onStandby = me?.active?.projectId === STANDBY_ID;
 
   // Today's totals: what the API measured at fetch time, plus the seconds
   // worked since (only while actively working — a break freezes them).
@@ -347,13 +353,15 @@ export default function ClockPage() {
           <span className="flex items-center gap-1.5 rounded-full border border-line bg-card px-2.5 py-1 text-[11px] text-ink-soft">
             {onBreak ? (
               <span className="inline-flex rounded-full h-2 w-2 bg-amber-500" />
+            ) : onStandby ? (
+              <span className="inline-flex rounded-full h-2 w-2 bg-violet-500" />
             ) : (
               <span className="relative flex h-2 w-2">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-500 opacity-60" />
                 <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500" />
               </span>
             )}
-            {onBreak ? "On break" : "Working"}
+            {onBreak ? "On break" : onStandby ? "Standby" : "Working"}
           </span>
         )}
       </div>
@@ -365,24 +373,49 @@ export default function ClockPage() {
       )}
       {!me && !error && <p className="text-sm text-ink-faint py-10 text-center">Loading…</p>}
 
+      {/* Standby strip — presence without a project. NOT a project card, so
+          it lives up here with the header, only while clocked out. */}
+      {me && !me.active && (
+        <div className="mb-4 flex items-center gap-2.5 rounded-xl border border-dashed border-violet-500/50 bg-violet-500/5 px-3 py-2.5">
+          <Armchair size={15} className="text-violet-500 shrink-0" />
+          <p className="flex-1 text-[12.5px] text-ink-soft">Present but no project yet?</p>
+          <button
+            onClick={() => clockIn(STANDBY_ID)}
+            disabled={busy}
+            className="rounded-lg border border-violet-500/60 px-3 py-1.5 text-[12.5px] font-medium text-violet-500 hover:bg-violet-500/10 disabled:opacity-50 shrink-0"
+          >
+            Go on standby
+          </button>
+        </div>
+      )}
+
       {/* Active session — dominates the screen. */}
       {me?.active && (
         <div
           className={`mb-5 rounded-2xl border-2 bg-card p-5 shadow-lg ${
-            onBreak ? "border-amber-500" : "border-accent"
+            onBreak ? "border-amber-500" : onStandby ? "border-violet-500" : "border-accent"
           }`}
         >
           <div className="flex items-center gap-2 mb-1">
-            <FolderKanban size={15} style={{ color: activeProject?.color }} />
+            {onStandby ? (
+              <Armchair size={15} className="text-violet-500" />
+            ) : (
+              <FolderKanban size={15} style={{ color: activeProject?.color }} />
+            )}
             <p className="font-medium truncate flex-1">
-              {activeProject?.name ?? "Deleted project — clock out"}
+              {onStandby ? "Standby" : (activeProject?.name ?? "Deleted project — clock out")}
             </p>
-            {onBreak && (
+            {onBreak ? (
               <span className="flex items-center gap-1 text-[12px] text-amber-500 shrink-0">
                 <Coffee size={12} />
                 paused
               </span>
-            )}
+            ) : onStandby ? (
+              <span className="flex items-center gap-1.5 text-[12px] text-violet-500 shrink-0">
+                <span className="inline-flex rounded-full h-1.5 w-1.5 bg-violet-500" />
+                waiting
+              </span>
+            ) : null}
           </div>
           {/* Main clock = the whole day, so switching projects never "resets"
               anything visible. The accent sub-clock is this project's day
@@ -399,11 +432,11 @@ export default function ClockPage() {
             {fmtTimer(todayTotal)}
           </p>
           <p className="mt-2 text-[10.5px] font-medium uppercase tracking-wide text-ink-faint">
-            This project
+            {onStandby ? "On standby" : "This project"}
           </p>
           <p
             className={`font-mono text-[22px] font-semibold tracking-tight mt-0.5 mb-3 tabular-nums ${
-              onBreak ? "text-ink-faint" : "text-accent"
+              onBreak ? "text-ink-faint" : onStandby ? "text-violet-500" : "text-accent"
             }`}
             suppressHydrationWarning
           >
@@ -431,6 +464,11 @@ export default function ClockPage() {
               Clock out
             </button>
           </div>
+          {onStandby && (
+            <p className="mt-3 text-[12px] text-ink-faint text-center">
+              Clock in on any project below to start working — standby ends by itself.
+            </p>
+          )}
 
           {/* Tasks on the project I'm clocked into — right where I work. */}
           {tasksFor(me.active.projectId).length > 0 && (
@@ -484,7 +522,7 @@ export default function ClockPage() {
             <div
               key={p.id}
               className={`rounded-2xl border border-line bg-card p-4 ${
-                me?.active ? "opacity-80" : ""
+                me?.active && !onStandby ? "opacity-80" : ""
               }`}
             >
               <div className="flex items-center gap-2.5">
@@ -518,9 +556,9 @@ export default function ClockPage() {
                     {weekMs > 0 ? `${fmtDur(weekMs)} this week` : "No time this week"}
                   </p>
                 </div>
-                {!me?.active ? (
+                {!me?.active || onStandby ? (
                   <button
-                    onClick={() => clockIn(p.id)}
+                    onClick={() => clockIn(p.id, onStandby)}
                     disabled={busy}
                     className="flex items-center gap-1.5 rounded-xl bg-accent px-4 py-3 text-white text-sm font-medium hover:bg-accent-hover disabled:opacity-50 transition-colors shrink-0"
                   >

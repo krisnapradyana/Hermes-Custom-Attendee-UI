@@ -27,7 +27,8 @@ const DIR = path.join(DATA_DIR, "slack-status");
 
 const WORKING_EMOJI = ":clapper:";
 const BREAK_EMOJI = ":coffee:";
-const OUR_EMOJI = new Set([WORKING_EMOJI, BREAK_EMOJI]);
+const STANDBY_EMOJI = ":seat:";
+const OUR_EMOJI = new Set([WORKING_EMOJI, BREAK_EMOJI, STANDBY_EMOJI]);
 const EXPIRATION_MS = 13 * 3600_000;
 
 interface TokenFile {
@@ -139,6 +140,10 @@ export function syncWorking(userKey: string, projectName?: string): void {
 
 export function syncBreak(userKey: string): void {
   quiet(setStatus(userKey, { text: "On a break", emoji: BREAK_EMOJI }));
+}
+
+export function syncStandby(userKey: string): void {
+  quiet(setStatus(userKey, { text: "Standby", emoji: STANDBY_EMOJI }));
 }
 
 export function syncClear(userKey: string): void {

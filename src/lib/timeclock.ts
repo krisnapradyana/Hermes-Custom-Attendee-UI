@@ -39,6 +39,14 @@ export interface MemberAggregate {
 
 const DATA_DIR = process.env.DATA_DIR ?? path.join(process.cwd(), "data");
 const DIR = path.join(DATA_DIR, "timeclock");
+
+/**
+ * Standby — present at the studio but not on any project. Implemented as a
+ * pseudo-project so every existing calculation (today/week/man-hours,
+ * overview, sweeps) counts it for free; UIs label and color it specially
+ * and keep it out of real-project lists.
+ */
+export const STANDBY_ID = "standby";
 const ACTIVE = path.join(DIR, "active.json");
 const AUTO_CLOSE_MS = 12 * 3600_000;
 const LOCK = "timeclock";
