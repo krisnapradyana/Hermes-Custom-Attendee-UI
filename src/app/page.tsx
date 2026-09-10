@@ -288,6 +288,22 @@ export default function ClockPage() {
   const [query, setQuery] = useState("");
   const q = query.trim().toLowerCase();
 
+  // "My tasks here" folds — with 10 open tasks it buried the project list.
+  // Remembered per browser; default collapsed.
+  const [tasksOpen, setTasksOpen] = useState(false);
+  useEffect(() => {
+    try {
+      setTasksOpen(localStorage.getItem("clock-tasks-open") === "1");
+    } catch {}
+  }, []);
+  const toggleTasks = () =>
+    setTasksOpen((v) => {
+      try {
+        localStorage.setItem("clock-tasks-open", v ? "0" : "1");
+      } catch {}
+      return !v;
+    });
+
   // Tasks live INSIDE their project row (dropdown), not as a separate list.
   const [expandedProj, setExpandedProj] = useState<string | null>(null);
   const tasksFor = (projectId: string) => (me?.tasks ?? []).filter((t) => t.projectId === projectId);
@@ -486,14 +502,19 @@ export default function ClockPage() {
             </p>
           )}
 
-          {/* My tasks here — same as the old active card, now its own glass card. */}
+          {/* My tasks here — collapsible glass card (default folded). */}
           {me.active && activeTasks.length > 0 && (
             <div className="glass-panel rounded-2xl border border-line/50 p-3.5 mb-3">
-              <p className="flex items-center gap-1.5 text-[10.5px] font-semibold uppercase tracking-[0.08em] text-ink-faint mb-2">
+              <button
+                onClick={toggleTasks}
+                className="w-full flex items-center gap-1.5 text-[10.5px] font-semibold uppercase tracking-[0.08em] text-ink-faint hover:text-ink-soft transition-colors"
+              >
                 <ListChecks size={11} />
                 My tasks here · {activeTasks.length}
-              </p>
-              <div className="space-y-1.5">{activeTasks.map(taskRow)}</div>
+                <span className="flex-1" />
+                {tasksOpen ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
+              </button>
+              {tasksOpen && <div className="space-y-1.5 mt-2">{activeTasks.map(taskRow)}</div>}
             </div>
           )}
 

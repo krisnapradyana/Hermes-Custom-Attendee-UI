@@ -40,9 +40,13 @@ html.dark {
   --color-card: #202329;
 }
 
-html,
-body {
+/* min-height (not height) — body must GROW with content so the canvas
+   gradient paints the full scroll height instead of ending mid-page. */
+html {
   height: 100%;
+}
+body {
+  min-height: 100%;
   background-color: var(--color-parchment);
   color: var(--color-ink);
   font-family: var(--font-sans-ui);
