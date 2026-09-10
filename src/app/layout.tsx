@@ -26,7 +26,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           }}
         />
       </head>
-      <body className="antialiased">
+      <body className="antialiased app-canvas">
         <Providers>
           <AuthGate>{children}</AuthGate>
         </Providers>

@@ -1,22 +1,25 @@
 @import "tailwindcss";
 
-/* Same design tokens as the main SuperPixel Assistant app. */
+/* UI-REFRESH — same design language as the main SuperPixel Assistant app:
+   sampled Figma tokens, gradient canvas (aurora in dark), liquid glass
+   materials, and the standardized motion vocabulary. */
 
 @custom-variant dark (&:where(.dark, .dark *));
 
 @theme {
-  --color-parchment: #f7f4eb;
-  --color-parchment-dark: #eae5d6;
-  --color-ink: #3d3929;
-  --color-ink-soft: #6e6a5b;
-  --color-ink-faint: #98937e;
-  --color-accent: #2a73e1;
-  --color-accent-hover: #1e5fc0;
-  --color-accent-soft: #e2ecfa;
-  --color-line: #dcd5c1;
-  --color-card: #f0ecdf;
+  --color-parchment: #f6f9fd;
+  --color-parchment-dark: #e7ebf0;
+  --color-ink: #1e2433;
+  --color-ink-soft: #7c8596;
+  --color-ink-faint: #98a1b2;
+  --color-accent: #1566e0;
+  --color-accent-hover: #0f55c2;
+  --color-accent-soft: #e3edfc;
+  --color-line: #e0e6ee;
+  --color-card: #ffffff;
 
-  --font-serif-display: "Georgia", "Times New Roman", serif;
+  --font-serif-display: "Plus Jakarta Sans Variable", "Plus Jakarta Sans", -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-sans-ui: "Plus Jakarta Sans Variable", "Plus Jakarta Sans", -apple-system, "Segoe UI", Roboto, sans-serif;
 }
 
 :root {
@@ -25,16 +28,16 @@
 
 html.dark {
   color-scheme: dark;
-  --color-parchment: #262624;
-  --color-parchment-dark: #1c1c1a;
-  --color-ink: #e8e6dc;
-  --color-ink-soft: #b3af9f;
-  --color-ink-faint: #817d6c;
-  --color-accent: #4c8ae8;
-  --color-accent-hover: #6ba0ee;
-  --color-accent-soft: #1c2a44;
-  --color-line: #3a3833;
-  --color-card: #2d2c29;
+  --color-parchment: #191b1f;
+  --color-parchment-dark: #14161a;
+  --color-ink: #e8eaef;
+  --color-ink-soft: #a6adba;
+  --color-ink-faint: #6e7684;
+  --color-accent: #4c8af5;
+  --color-accent-hover: #6ba0f7;
+  --color-accent-soft: #1a2a4a;
+  --color-line: #2b2f37;
+  --color-card: #202329;
 }
 
 html,
@@ -42,9 +45,109 @@ body {
   height: 100%;
   background-color: var(--color-parchment);
   color: var(--color-ink);
+  font-family: var(--font-sans-ui);
 }
 
 * {
   scrollbar-width: thin;
   scrollbar-color: var(--color-line) transparent;
+}
+
+/* Canvas — light: Figma gradient; dark: aurora glows for the glass to catch. */
+.app-canvas {
+  background: linear-gradient(135deg, #cfe3ff 0%, #e6f0ff 30%, #f6fafd 55%, #e6f8f1 100%);
+}
+html.dark .app-canvas {
+  background:
+    radial-gradient(420px 320px at 10% -6%, rgba(42, 107, 242, 0.28), transparent 70%),
+    radial-gradient(340px 260px at 85% -6%, rgba(139, 92, 246, 0.18), transparent 70%),
+    radial-gradient(360px 300px at 105% 106%, rgba(29, 158, 117, 0.16), transparent 70%),
+    #14161c;
+}
+
+/* Liquid glass — chrome (header pills, active card). */
+.glass {
+  background: rgba(255, 255, 255, 0.42);
+  backdrop-filter: blur(18px) saturate(160%);
+  -webkit-backdrop-filter: blur(18px) saturate(160%);
+  border: 1px solid rgba(255, 255, 255, 0.65);
+  box-shadow:
+    0 12px 36px rgba(23, 43, 99, 0.14),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+html.dark .glass {
+  background: rgba(28, 32, 40, 0.42);
+  backdrop-filter: blur(22px) saturate(190%);
+  -webkit-backdrop-filter: blur(22px) saturate(190%);
+  border-color: rgba(255, 255, 255, 0.12);
+  box-shadow:
+    0 14px 40px rgba(0, 0, 0, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.13);
+}
+
+/* Glass for content cards (tasks, switch-to list) — no border of its own. */
+.glass-panel {
+  background: rgba(255, 255, 255, 0.55);
+  backdrop-filter: blur(14px) saturate(150%);
+  -webkit-backdrop-filter: blur(14px) saturate(150%);
+  box-shadow:
+    0 8px 24px rgba(23, 43, 99, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.8);
+}
+html.dark .glass-panel {
+  background: rgba(28, 32, 40, 0.45);
+  backdrop-filter: blur(18px) saturate(180%);
+  -webkit-backdrop-filter: blur(18px) saturate(180%);
+  box-shadow:
+    0 8px 24px rgba(0, 0, 0, 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+/* Ice glass — floating windows / inline confirms: dense, never see-through. */
+.glass-ice {
+  background: rgba(255, 255, 255, 0.88);
+  backdrop-filter: blur(32px) saturate(160%);
+  -webkit-backdrop-filter: blur(32px) saturate(160%);
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  box-shadow:
+    0 18px 50px rgba(23, 43, 99, 0.22),
+    inset 0 1px 0 rgba(255, 255, 255, 1);
+}
+html.dark .glass-ice {
+  background: rgba(26, 30, 38, 0.92);
+  border-color: rgba(255, 255, 255, 0.14);
+  box-shadow:
+    0 18px 50px rgba(0, 0, 0, 0.6),
+    inset 0 1px 0 rgba(255, 255, 255, 0.12);
+}
+
+/* Motion vocabulary — identical to the main app. */
+@keyframes ui-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+@keyframes ui-slide-left {
+  from {
+    opacity: 0;
+    transform: translateX(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .anim-pop {
+    animation: ui-pop 170ms cubic-bezier(0.16, 1, 0.3, 1) backwards;
+    transform-origin: top center;
+  }
+  .anim-slide {
+    animation: ui-slide-left 160ms ease-out backwards;
+  }
 }
