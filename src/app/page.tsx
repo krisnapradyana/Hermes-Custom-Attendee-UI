@@ -459,10 +459,11 @@ export default function ClockPage() {
           <div className="flex items-center justify-center gap-3.5 my-4">
             {me.active ? (
               <>
+                {/* ≥768px: player buttons grow ~28% (44→56 / 56→72), icons ~25%. */}
                 <button
                   onClick={toggleBreak}
                   disabled={busy}
-                  className={`w-11 h-11 rounded-full flex items-center justify-center transition-colors disabled:opacity-50 ${
+                  className={`w-11 h-11 md:w-14 md:h-14 rounded-full flex items-center justify-center transition-colors disabled:opacity-50 md:[&>svg]:scale-125 ${
                     onBreak
                       ? "bg-amber-500 text-white hover:bg-amber-600"
                       : "glass text-ink-soft hover:text-ink"
@@ -474,7 +475,7 @@ export default function ClockPage() {
                 <button
                   onClick={clockOut}
                   disabled={busy}
-                  className="w-14 h-14 rounded-full bg-accent text-white flex items-center justify-center hover:bg-accent-hover disabled:opacity-50 transition-colors shadow-[0_10px_24px_rgba(21,102,224,0.4)]"
+                  className="w-14 h-14 md:w-[72px] md:h-[72px] rounded-full bg-accent text-white flex items-center justify-center hover:bg-accent-hover disabled:opacity-50 transition-colors shadow-[0_10px_24px_rgba(21,102,224,0.4)] md:[&>svg]:scale-125"
                   title="Clock out"
                 >
                   <Square size={18} />
@@ -482,7 +483,7 @@ export default function ClockPage() {
                 <button
                   onClick={() => !onStandby && clockIn(STANDBY_ID, true)}
                   disabled={busy || onStandby}
-                  className={`w-11 h-11 rounded-full flex items-center justify-center transition-colors ${
+                  className={`w-11 h-11 md:w-14 md:h-14 rounded-full flex items-center justify-center transition-colors md:[&>svg]:scale-125 ${
                     onStandby
                       ? "bg-violet-500 text-white cursor-default"
                       : "border border-violet-500/50 bg-violet-500/10 text-violet-500 hover:bg-violet-500/20"
