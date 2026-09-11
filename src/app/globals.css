@@ -175,3 +175,39 @@ html.dark .scroll-fade::after {
     animation: ui-slide-left 160ms ease-out backwards;
   }
 }
+
+/* YT-Music layout (≥768px): the hero timer sits in a square glass "album"
+   tile with its own inner color wash. Below 768px the class is inert and
+   the phone hero renders exactly as before. */
+@media (min-width: 768px) {
+  .hero-album {
+    aspect-ratio: 1 / 1;
+    max-height: 46dvh;
+    border-radius: 24px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    background:
+      radial-gradient(45% 45% at 30% 25%, rgba(42, 107, 242, 0.14), transparent 70%),
+      radial-gradient(40% 40% at 75% 80%, rgba(139, 92, 246, 0.10), transparent 70%),
+      rgba(255, 255, 255, 0.5);
+    backdrop-filter: blur(18px) saturate(160%);
+    -webkit-backdrop-filter: blur(18px) saturate(160%);
+    border: 1px solid rgba(255, 255, 255, 0.7);
+    box-shadow:
+      0 16px 40px rgba(23, 43, 99, 0.14),
+      inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  }
+  html.dark .hero-album {
+    background:
+      radial-gradient(45% 45% at 30% 25%, rgba(42, 107, 242, 0.25), transparent 70%),
+      radial-gradient(40% 40% at 75% 80%, rgba(139, 92, 246, 0.18), transparent 70%),
+      rgba(28, 32, 40, 0.5);
+    border-color: rgba(255, 255, 255, 0.13);
+    box-shadow:
+      0 18px 44px rgba(0, 0, 0, 0.5),
+      inset 0 1px 0 rgba(255, 255, 255, 0.12);
+  }
+}

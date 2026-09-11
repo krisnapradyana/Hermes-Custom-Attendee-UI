@@ -108,6 +108,19 @@ export default function ClockPage() {
     return () => clearInterval(t);
   }, []);
 
+  // IF ≥768px (tablet/laptop/PC): YouTube-Music layout — hero tile on the
+  // left, tabbed Projects/Tasks panel on the right. ELSE (phone): the
+  // stacked layout stays exactly as shipped.
+  const [wide, setWide] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia("(min-width: 768px)");
+    const apply = () => setWide(mq.matches);
+    apply();
+    mq.addEventListener("change", apply);
+    return () => mq.removeEventListener("change", apply);
+  }, []);
+  const [rightTab, setRightTab] = useState<"projects" | "tasks">("projects");
+
   // When the totals were fetched — lets the "today" numbers tick live between
   // refreshes while working (they freeze on break; every break toggle reloads).
   const [fetchedAt, setFetchedAt] = useState(() => Date.now());
@@ -303,13 +316,17 @@ export default function ClockPage() {
     );
   }
 
-  /** One task row — used inside "My tasks here" and expanded project rows. */
-  const taskRow = (t: TcTask) => (
+  /** One task row — used inside "My tasks here", expanded project rows, and
+   *  (with showProject) the wide layout's all-tasks tab. */
+  const taskRow = (t: TcTask, showProject = false) => (
     <div key={t.id} className="rounded-xl bg-parchment-dark/50 px-3 py-2">
       <div className="flex items-center gap-2.5">
         <div className="flex-1 min-w-0">
           <p className="text-[13.5px] font-semibold truncate">{t.title}</p>
           <p className="text-[11px] text-ink-faint truncate">
+            {showProject
+              ? `${me?.projects.find((p) => p.id === t.projectId)?.name ?? "Deleted project"} · `
+              : ""}
             {t.phase ? `${t.phase} · ` : ""}
             {t.dueDate
               ? `due ${new Date(`${t.dueDate}T00:00:00`).toLocaleDateString(undefined, {
@@ -374,7 +391,7 @@ export default function ClockPage() {
     // real height (the body gradient stretches seamlessly since the
     // min-height fix, so no seam). ELSE (tablet/desktop): fixed viewport,
     // nothing scrolls but the cards.
-    <div className="mx-auto max-w-md w-full px-4 py-5 min-h-dvh sm:h-dvh sm:overflow-hidden flex flex-col">
+    <div className="mx-auto max-w-md md:max-w-4xl w-full px-4 md:px-6 py-5 min-h-dvh sm:h-dvh sm:overflow-hidden flex flex-col">
       {/* Header: wordmark + theme toggle */}
       <div className="flex items-center mb-4">
         <Wordmark />
@@ -396,13 +413,13 @@ export default function ClockPage() {
       {!me && !error && <p className="text-sm text-ink-faint py-10 text-center">Loading…</p>}
 
       {me && (
-        <>
-          {/* Hero — the day total IS the app. */}
-          <p className="text-center text-[12px] text-ink-soft" suppressHydrationWarning>
-            {greet}
-          </p>
+        <div className="flex flex-col md:flex-row md:gap-6 flex-1 min-h-0">
+          {/* LEFT (wide) / top (phone): the "now playing" side. */}
+          <div className="flex flex-col md:w-[42%] md:shrink-0 md:justify-center">
+          {/* Hero — on wide screens it lives in a square glass "album" tile. */}
+          <div className="hero-album">
           <p
-            className={`mt-3 text-center text-[10.5px] font-semibold uppercase tracking-[0.08em] ${
+            className={`mt-3 md:mt-0 text-center text-[10.5px] font-semibold uppercase tracking-[0.08em] ${
               onBreak ? "text-amber-500" : "text-ink-faint"
             }`}
           >
@@ -433,8 +450,12 @@ export default function ClockPage() {
               <span className="text-ink-faint">Not clocked in — pick a project below</span>
             )}
           </p>
+          <p className="mt-2 text-center text-[12px] text-ink-soft" suppressHydrationWarning>
+            {greet}
+          </p>
+          </div>
 
-          {/* Round action buttons */}
+          {/* Round action buttons — player controls under the album. */}
           <div className="flex items-center justify-center gap-3.5 my-4">
             {me.active ? (
               <>
@@ -488,20 +509,65 @@ export default function ClockPage() {
               Clock in on any project below — standby ends by itself.
             </p>
           )}
+          </div>
 
-          {/* My tasks here — persistent fixed-height card, scrolls inside. */}
-          {me.active && activeTasks.length > 0 && (
+          {/* RIGHT (wide) / rest (phone): lists. Wide = tabbed panel. */}
+          <div className="flex flex-col flex-1 min-h-0">
+          {wide && (
+            <div className="flex gap-1.5 mb-2.5 shrink-0">
+              <button
+                onClick={() => setRightTab("projects")}
+                className={`rounded-full px-4 py-1.5 text-[12.5px] font-semibold transition-colors ${
+                  rightTab === "projects"
+                    ? "bg-ink/10 dark:bg-white/15 text-ink"
+                    : "text-ink-soft hover:text-ink"
+                }`}
+              >
+                Projects · {mineProjects.length + otherProjects.length}
+              </button>
+              <button
+                onClick={() => setRightTab("tasks")}
+                className={`rounded-full px-4 py-1.5 text-[12.5px] font-semibold transition-colors ${
+                  rightTab === "tasks"
+                    ? "bg-ink/10 dark:bg-white/15 text-ink"
+                    : "text-ink-soft hover:text-ink"
+                }`}
+              >
+                My tasks · {me.tasks.length}
+              </button>
+            </div>
+          )}
+
+          {/* Wide "My tasks" tab: ALL my tasks across projects. */}
+          {wide && rightTab === "tasks" && (
+            <div className="glass-panel scroll-fade rounded-2xl border border-line/50 px-3.5 pt-3.5 flex-1 min-h-0 flex flex-col overflow-hidden">
+              <div className="flex-1 min-h-0 overflow-y-auto space-y-1.5 pb-4">
+                {me.tasks.map((t) => taskRow(t, true))}
+                {me.tasks.length === 0 && (
+                  <p className="text-sm text-ink-faint text-center py-8">
+                    Nothing assigned to you right now.
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Phone-only: active project's tasks as its own card. */}
+          {!wide && me.active && activeTasks.length > 0 && (
             <div className="glass-panel scroll-fade rounded-2xl border border-line/50 px-3.5 pt-3.5 mb-3 shrink-0 max-h-[340px] sm:max-h-[176px] flex flex-col overflow-hidden">
               <p className="flex items-center gap-1.5 text-[10.5px] font-semibold uppercase tracking-[0.08em] text-ink-faint shrink-0">
                 <ListChecks size={11} />
                 My tasks here · {activeTasks.length}
               </p>
               <div className="flex-1 min-h-0 overflow-y-auto space-y-1.5 mt-2 pb-4">
-                {activeTasks.map(taskRow)}
+                {activeTasks.map((t) => taskRow(t))}
               </div>
             </div>
           )}
 
+          {/* Projects view (phone always; wide only on the Projects tab). */}
+          {(!wide || rightTab === "projects") && (
+          <>
           {/* Search */}
           <div className="relative mb-3 shrink-0">
             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-faint" />
@@ -642,7 +708,7 @@ export default function ClockPage() {
 
                     {/* Tasks live inside the row — tap the name to open. */}
                     {isOpen && tasks.length > 0 && !confirming && (
-                      <div className="mt-2 space-y-1.5 pl-9">{tasks.map(taskRow)}</div>
+                      <div className="mt-2 space-y-1.5 pl-9">{tasks.map((t) => taskRow(t))}</div>
                     )}
                   </div>
                 );
@@ -664,7 +730,10 @@ export default function ClockPage() {
               )}
             </div>
           </div>
-        </>
+          </>
+          )}
+          </div>
+        </div>
       )}
 
       {/* Slack status sync — one-time opt-in, then automatic. */}
