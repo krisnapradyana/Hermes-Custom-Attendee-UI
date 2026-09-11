@@ -370,10 +370,11 @@ export default function ClockPage() {
   })();
 
   return (
-    // Fixed viewport: the PAGE never scrolls or grows (the aurora background
-    // always exactly fills the screen — no seam). The two list cards below
-    // own all scrolling internally.
-    <div className="mx-auto max-w-md w-full px-4 py-5 h-dvh overflow-hidden flex flex-col">
+    // IF phone (<640px): the page may grow to ~2 screens so both cards get
+    // real height (the body gradient stretches seamlessly since the
+    // min-height fix, so no seam). ELSE (tablet/desktop): fixed viewport,
+    // nothing scrolls but the cards.
+    <div className="mx-auto max-w-md w-full px-4 py-5 min-h-dvh sm:h-dvh sm:overflow-hidden flex flex-col">
       {/* Header: wordmark + theme toggle */}
       <div className="flex items-center mb-4">
         <Wordmark />
@@ -490,7 +491,7 @@ export default function ClockPage() {
 
           {/* My tasks here — persistent fixed-height card, scrolls inside. */}
           {me.active && activeTasks.length > 0 && (
-            <div className="glass-panel scroll-fade rounded-2xl border border-line/50 px-3.5 pt-3.5 mb-3 shrink-0 max-h-[176px] flex flex-col overflow-hidden">
+            <div className="glass-panel scroll-fade rounded-2xl border border-line/50 px-3.5 pt-3.5 mb-3 shrink-0 max-h-[340px] sm:max-h-[176px] flex flex-col overflow-hidden">
               <p className="flex items-center gap-1.5 text-[10.5px] font-semibold uppercase tracking-[0.08em] text-ink-faint shrink-0">
                 <ListChecks size={11} />
                 My tasks here · {activeTasks.length}
@@ -524,7 +525,7 @@ export default function ClockPage() {
           {/* Switch to / Clock in to — persistent card filling the leftover
               space; EVERY project lives in one internal scroll (the old
               "Show other projects" toggle is gone). */}
-          <div className="glass-panel scroll-fade rounded-2xl border border-line/50 px-3.5 pt-3.5 flex-1 min-h-0 flex flex-col overflow-hidden">
+          <div className="glass-panel scroll-fade rounded-2xl border border-line/50 px-3.5 pt-3.5 h-[60dvh] sm:h-auto sm:flex-1 min-h-0 flex flex-col overflow-hidden">
             <p className="text-[10.5px] font-semibold uppercase tracking-[0.08em] text-ink-faint mb-2 shrink-0">
               {me.active && !onStandby ? "Switch to" : "Clock in to"} ·{" "}
               {mineProjects.length + otherProjects.length}
