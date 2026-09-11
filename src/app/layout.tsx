@@ -27,7 +27,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           }}
         />
       </head>
-      <body className="antialiased app-canvas">
+      <body className="antialiased">
+        {/* Canvas pinned to the VIEWPORT (not the page): the aurora never
+            scrolls, so glows stay in the screen corners at any page height —
+            no seams, no mid-scroll patches (field screenshot). */}
+        <div className="app-canvas fixed inset-0 -z-10" aria-hidden />
         <Providers>
           <AuthGate>{children}</AuthGate>
         </Providers>
