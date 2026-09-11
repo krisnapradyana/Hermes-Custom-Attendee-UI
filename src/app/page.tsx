@@ -511,8 +511,10 @@ export default function ClockPage() {
           )}
           </div>
 
-          {/* RIGHT (wide) / rest (phone): lists. Wide = tabbed panel. */}
-          <div className="flex flex-col flex-1 min-h-0">
+          {/* RIGHT (wide) / rest (phone): lists. Wide = tabbed panel.
+              min-w-0 is CRITICAL: without it one long project name inflates
+              the column past the viewport and clips the buttons (16:9 bug). */}
+          <div className="flex flex-col flex-1 min-h-0 min-w-0">
           {wide && (
             <div className="flex gap-1.5 mb-2.5 shrink-0">
               <button
