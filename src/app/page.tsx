@@ -181,7 +181,6 @@ export default function ClockPage() {
       otherProjects: list.filter((p) => !mine.has(p.id)),
     };
   }, [me, weekByProject, session]);
-  const [showOthers, setShowOthers] = useState(false);
 
   // A task tapped via "Start" — marked as doing once the clock-in succeeds
   // (including after the switch-project confirmation).
@@ -288,22 +287,6 @@ export default function ClockPage() {
   const [query, setQuery] = useState("");
   const q = query.trim().toLowerCase();
 
-  // "My tasks here" folds — with 10 open tasks it buried the project list.
-  // Remembered per browser; default collapsed.
-  const [tasksOpen, setTasksOpen] = useState(false);
-  useEffect(() => {
-    try {
-      setTasksOpen(localStorage.getItem("clock-tasks-open") === "1");
-    } catch {}
-  }, []);
-  const toggleTasks = () =>
-    setTasksOpen((v) => {
-      try {
-        localStorage.setItem("clock-tasks-open", v ? "0" : "1");
-      } catch {}
-      return !v;
-    });
-
   // Tasks live INSIDE their project row (dropdown), not as a separate list.
   const [expandedProj, setExpandedProj] = useState<string | null>(null);
   const tasksFor = (projectId: string) => (me?.tasks ?? []).filter((t) => t.projectId === projectId);
@@ -387,7 +370,10 @@ export default function ClockPage() {
   })();
 
   return (
-    <div className="mx-auto max-w-md px-4 py-5 min-h-screen flex flex-col">
+    // Fixed viewport: the PAGE never scrolls or grows (the aurora background
+    // always exactly fills the screen — no seam). The two list cards below
+    // own all scrolling internally.
+    <div className="mx-auto max-w-md w-full px-4 py-5 h-dvh overflow-hidden flex flex-col">
       {/* Header: wordmark + theme toggle */}
       <div className="flex items-center mb-4">
         <Wordmark />
@@ -502,24 +488,21 @@ export default function ClockPage() {
             </p>
           )}
 
-          {/* My tasks here — collapsible glass card (default folded). */}
+          {/* My tasks here — persistent fixed-height card, scrolls inside. */}
           {me.active && activeTasks.length > 0 && (
-            <div className="glass-panel rounded-2xl border border-line/50 p-3.5 mb-3">
-              <button
-                onClick={toggleTasks}
-                className="w-full flex items-center gap-1.5 text-[10.5px] font-semibold uppercase tracking-[0.08em] text-ink-faint hover:text-ink-soft transition-colors"
-              >
+            <div className="glass-panel scroll-fade rounded-2xl border border-line/50 px-3.5 pt-3.5 mb-3 shrink-0 max-h-[176px] flex flex-col overflow-hidden">
+              <p className="flex items-center gap-1.5 text-[10.5px] font-semibold uppercase tracking-[0.08em] text-ink-faint shrink-0">
                 <ListChecks size={11} />
                 My tasks here · {activeTasks.length}
-                <span className="flex-1" />
-                {tasksOpen ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
-              </button>
-              {tasksOpen && <div className="space-y-1.5 mt-2">{activeTasks.map(taskRow)}</div>}
+              </p>
+              <div className="flex-1 min-h-0 overflow-y-auto space-y-1.5 mt-2 pb-4">
+                {activeTasks.map(taskRow)}
+              </div>
             </div>
           )}
 
           {/* Search */}
-          <div className="relative mb-3">
+          <div className="relative mb-3 shrink-0">
             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-faint" />
             <input
               value={query}
@@ -538,19 +521,20 @@ export default function ClockPage() {
             )}
           </div>
 
-          {/* Switch to / Clock in to — one glass card of project rows. */}
-          <div className="glass-panel rounded-2xl border border-line/50 p-3.5 flex-1">
-            <p className="text-[10.5px] font-semibold uppercase tracking-[0.08em] text-ink-faint mb-2">
-              {me.active && !onStandby ? "Switch to" : "Clock in to"}
+          {/* Switch to / Clock in to — persistent card filling the leftover
+              space; EVERY project lives in one internal scroll (the old
+              "Show other projects" toggle is gone). */}
+          <div className="glass-panel scroll-fade rounded-2xl border border-line/50 px-3.5 pt-3.5 flex-1 min-h-0 flex flex-col overflow-hidden">
+            <p className="text-[10.5px] font-semibold uppercase tracking-[0.08em] text-ink-faint mb-2 shrink-0">
+              {me.active && !onStandby ? "Switch to" : "Clock in to"} ·{" "}
+              {mineProjects.length + otherProjects.length}
             </p>
-            <div className="space-y-1">
+            <div className="flex-1 min-h-0 overflow-y-auto pb-4 space-y-1">
               {(q
                 ? [...mineProjects, ...otherProjects].filter((p) =>
                     p.name.toLowerCase().includes(q)
                   )
-                : showOthers
-                  ? [...mineProjects, ...otherProjects]
-                  : mineProjects
+                : [...mineProjects, ...otherProjects]
               ).map((p) => {
                 const isActive = me.active?.projectId === p.id;
                 if (isActive) return null;
@@ -662,36 +646,22 @@ export default function ClockPage() {
                   </div>
                 );
               })}
-            </div>
 
-            {q &&
-              [...mineProjects, ...otherProjects].filter((p) => p.name.toLowerCase().includes(q))
-                .length === 0 && (
-                <p className="text-sm text-ink-faint text-center py-5">
-                  No projects match &ldquo;{query.trim()}&rdquo;.
+              {q &&
+                [...mineProjects, ...otherProjects].filter((p) =>
+                  p.name.toLowerCase().includes(q)
+                ).length === 0 && (
+                  <p className="text-sm text-ink-faint text-center py-5">
+                    No projects match &ldquo;{query.trim()}&rdquo;.
+                  </p>
+                )}
+
+              {mineProjects.length === 0 && otherProjects.length === 0 && (
+                <p className="text-sm text-ink-faint text-center py-8">
+                  No projects yet — create one in the SuperPixel Assistant first.
                 </p>
               )}
-
-            {!q && otherProjects.length > 0 && (
-              <button
-                onClick={() => setShowOthers(!showOthers)}
-                className="w-full text-center text-[12px] text-ink-faint hover:text-ink py-2 transition-colors"
-              >
-                {showOthers ? "Hide other projects" : `Show other projects · ${otherProjects.length}`}
-              </button>
-            )}
-
-            {mineProjects.length === 0 && otherProjects.length === 0 && (
-              <p className="text-sm text-ink-faint text-center py-8">
-                No projects yet — create one in the SuperPixel Assistant first.
-              </p>
-            )}
-            {!q && mineProjects.length === 0 && otherProjects.length > 0 && !showOthers && (
-              <p className="text-sm text-ink-faint text-center py-5">
-                No projects assigned to you yet — ask your PM for a task, or show other projects
-                above.
-              </p>
-            )}
+            </div>
           </div>
         </>
       )}

@@ -125,6 +125,26 @@ html.dark .glass-ice {
     inset 0 1px 0 rgba(255, 255, 255, 0.12);
 }
 
+/* Bottom fade for internally-scrolling cards — hints "there's more" without
+   the page ever growing. Tone matches the glass fill per theme. */
+.scroll-fade {
+  position: relative;
+}
+.scroll-fade::after {
+  content: "";
+  position: absolute;
+  left: 1px;
+  right: 1px;
+  bottom: 1px;
+  height: 20px;
+  pointer-events: none;
+  border-radius: 0 0 15px 15px;
+  background: linear-gradient(transparent, rgba(246, 249, 253, 0.92));
+}
+html.dark .scroll-fade::after {
+  background: linear-gradient(transparent, rgba(20, 23, 28, 0.92));
+}
+
 /* Motion vocabulary — identical to the main app. */
 @keyframes ui-pop {
   from {
