@@ -210,4 +210,21 @@ html.dark .scroll-fade::after {
       0 18px 44px rgba(0, 0, 0, 0.5),
       inset 0 1px 0 rgba(255, 255, 255, 0.12);
   }
+
+  /* General duty: the album glass goes teal so the state is readable
+     across the room, matching the pinned row and the stop button. */
+  .hero-album.hero-general {
+    background:
+      radial-gradient(45% 45% at 30% 25%, rgba(13, 148, 136, 0.2), transparent 70%),
+      radial-gradient(40% 40% at 75% 80%, rgba(16, 185, 129, 0.13), transparent 70%),
+      rgba(255, 255, 255, 0.5);
+    border-color: rgba(13, 148, 136, 0.35);
+  }
+  html.dark .hero-album.hero-general {
+    background:
+      radial-gradient(45% 45% at 30% 25%, rgba(20, 184, 166, 0.3), transparent 70%),
+      radial-gradient(40% 40% at 75% 80%, rgba(16, 185, 129, 0.18), transparent 70%),
+      rgba(24, 34, 34, 0.55);
+    border-color: rgba(45, 212, 191, 0.28);
+  }
 }

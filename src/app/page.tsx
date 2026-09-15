@@ -429,7 +429,7 @@ export default function ClockPage() {
           {/* LEFT (wide) / top (phone): the "now playing" side. */}
           <div className="flex flex-col md:w-[42%] md:shrink-0 md:justify-center">
           {/* Hero — on wide screens it lives in a square glass "album" tile. */}
-          <div className="hero-album">
+          <div className={onGeneral ? "hero-album hero-general" : "hero-album"}>
           <p
             className={`mt-3 md:mt-0 text-center text-[10.5px] font-semibold uppercase tracking-[0.08em] ${
               onBreak ? "text-amber-500" : "text-ink-faint"
@@ -492,7 +492,11 @@ export default function ClockPage() {
                 <button
                   onClick={clockOut}
                   disabled={busy}
-                  className="w-14 h-14 md:w-[72px] md:h-[72px] rounded-full bg-accent text-white flex items-center justify-center hover:bg-accent-hover disabled:opacity-50 transition-colors shadow-[0_10px_24px_rgba(21,102,224,0.4)] md:[&>svg]:scale-125"
+                  className={`w-14 h-14 md:w-[72px] md:h-[72px] rounded-full text-white flex items-center justify-center disabled:opacity-50 transition-colors md:[&>svg]:scale-125 ${
+                    onGeneral
+                      ? "bg-teal-600 hover:bg-teal-500 shadow-[0_10px_24px_rgba(13,148,136,0.4)]"
+                      : "bg-accent hover:bg-accent-hover shadow-[0_10px_24px_rgba(21,102,224,0.4)]"
+                  }`}
                   title="Clock out"
                 >
                   <Square size={18} />
