@@ -17,6 +17,7 @@ import {
   ChevronDown,
   ChevronRight,
   Armchair,
+  Building2,
   Sun,
   Moon,
 } from "lucide-react";
@@ -25,6 +26,10 @@ import { TcProject, TcTask } from "@/lib/projects";
 
 /** Pseudo-project id for "present, no project" — see lib/timeclock.ts. */
 const STANDBY_ID = "standby";
+/** Pseudo-project id for "working, but not on a project" (ops, admin,
+ * studio management) — pinned as the first row of the project list. */
+const GENERAL_ID = "general";
+const GENERAL_SUBTITLE = "Non-project work — ops, admin, studio management";
 
 /**
  * The clock — UI-refresh "hero" layout (approved mock): the day-total timer
@@ -287,6 +292,13 @@ export default function ClockPage() {
     : undefined;
   const onBreak = !!me?.active?.breakAt;
   const onStandby = me?.active?.projectId === STANDBY_ID;
+  const onGeneral = me?.active?.projectId === GENERAL_ID;
+  /** Human name of wherever the user currently is — for switch confirms. */
+  const activeName = onStandby
+    ? "Standby"
+    : onGeneral
+      ? "General duty"
+      : (activeProject?.name ?? "your current project");
 
   // Today's totals: what the API measured at fetch time, plus the seconds
   // worked since (only while actively working — a break freezes them).
@@ -439,6 +451,11 @@ export default function ClockPage() {
                 <span className="text-violet-500">
                   <Armchair size={11} className="inline mr-1 -mt-0.5" />
                   Standby · <span className="font-mono tabular-nums">{fmtTimer(activeProjToday)}</span>
+                </span>
+              ) : onGeneral ? (
+                <span className={onBreak ? "text-ink-faint" : "text-teal-600 dark:text-teal-400"}>
+                  <Building2 size={11} className="inline mr-1 -mt-0.5" />
+                  General duty · <span className="font-mono tabular-nums">{fmtTimer(activeProjToday)}</span>
                 </span>
               ) : (
                 <span className={onBreak ? "text-ink-faint" : "text-accent"}>
@@ -600,6 +617,83 @@ export default function ClockPage() {
               {mineProjects.length + otherProjects.length}
             </p>
             <div className="flex-1 min-h-0 overflow-y-auto pb-4 space-y-1">
+              {/* General duty — pinned pseudo-project (approved option B):
+                  for members whose work isn't a project (ops, studio
+                  management, marketing). Same switch/confirm flow, teal. */}
+              {!onGeneral && (!q || "general duty".includes(q)) && (
+                <div
+                  className={
+                    confirmSwitch === GENERAL_ID
+                      ? "glass-ice anim-pop rounded-xl border-[1.5px] border-teal-500 p-3"
+                      : "rounded-xl px-1 py-1.5 bg-teal-500/10"
+                  }
+                >
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 bg-teal-500/20">
+                      <Building2 size={13} className="text-teal-600 dark:text-teal-400" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold text-[13.5px] truncate text-teal-700 dark:text-teal-300">
+                        General duty
+                      </p>
+                      <p className="text-[11px] text-ink-faint truncate">
+                        {GENERAL_SUBTITLE}
+                        {(todayByProject.get(GENERAL_ID) ?? 0) > 0 &&
+                          ` · ${fmtDur(todayByProject.get(GENERAL_ID) ?? 0)} today`}
+                      </p>
+                    </div>
+                    {confirmSwitch !== GENERAL_ID &&
+                      (!me.active || onStandby ? (
+                        <button
+                          onClick={() => clockIn(GENERAL_ID, onStandby)}
+                          disabled={busy}
+                          className="flex items-center gap-1.5 rounded-xl bg-teal-600 px-3.5 py-2 text-white text-[12.5px] font-semibold hover:bg-teal-500 disabled:opacity-50 transition-colors shrink-0"
+                        >
+                          <Play size={12} />
+                          Clock in
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => setConfirmSwitch(GENERAL_ID)}
+                          disabled={busy}
+                          className="flex items-center gap-1.5 rounded-xl border border-teal-500/50 bg-card/50 px-3 py-2 text-[12px] text-teal-700 dark:text-teal-300 hover:border-teal-500 disabled:opacity-50 transition-colors shrink-0"
+                        >
+                          <ArrowLeftRight size={12} />
+                          Switch
+                        </button>
+                      ))}
+                  </div>
+                  {confirmSwitch === GENERAL_ID && (
+                    <div className="mt-2.5">
+                      <p className="text-[12.5px] text-ink-soft leading-relaxed mb-2.5">
+                        Clock out of <span className="font-semibold text-ink">{activeName}</span>{" "}
+                        and switch to general duty? Your{" "}
+                        <span className="font-mono tabular-nums font-semibold text-ink">
+                          {fmtTimer(activeProjToday)}
+                        </span>{" "}
+                        there is saved.
+                      </p>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => clockIn(GENERAL_ID, true)}
+                          disabled={busy}
+                          className="flex-1 flex items-center justify-center gap-1.5 rounded-xl bg-teal-600 px-3 py-2.5 text-[13px] font-semibold text-white hover:bg-teal-500 disabled:opacity-50"
+                        >
+                          <ArrowLeftRight size={13} />
+                          Switch
+                        </button>
+                        <button
+                          onClick={() => setConfirmSwitch(null)}
+                          className="flex-1 rounded-xl border border-line bg-card/50 px-3 py-2.5 text-[13px] text-ink-soft hover:border-ink-faint"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
               {(q
                 ? [...mineProjects, ...otherProjects].filter((p) =>
                     p.name.toLowerCase().includes(q)
@@ -678,10 +772,8 @@ export default function ClockPage() {
                       <div className="mt-2.5">
                         <p className="text-[12.5px] text-ink-soft leading-relaxed mb-2.5">
                           Clock out of{" "}
-                          <span className="font-semibold text-ink">
-                            {activeProject?.name ?? "your current project"}
-                          </span>{" "}
-                          and start here? Your{" "}
+                          <span className="font-semibold text-ink">{activeName}</span> and start
+                          here? Your{" "}
                           <span className="font-mono tabular-nums font-semibold text-ink">
                             {fmtTimer(activeProjToday)}
                           </span>{" "}

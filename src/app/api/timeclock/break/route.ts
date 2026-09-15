@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import { requireUser } from "@/lib/user-key";
-import { toggleBreak, STANDBY_ID } from "@/lib/timeclock";
+import { toggleBreak, STANDBY_ID, GENERAL_ID } from "@/lib/timeclock";
 import { fetchProjects } from "@/lib/projects";
-import { syncBreak, syncWorking, syncStandby } from "@/lib/slack-status";
+import { syncBreak, syncWorking, syncStandby, syncGeneral } from "@/lib/slack-status";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -21,6 +21,8 @@ export async function POST() {
     syncBreak(gate.user.key);
   } else if (result.projectId === STANDBY_ID) {
     syncStandby(gate.user.key);
+  } else if (result.projectId === GENERAL_ID) {
+    syncGeneral(gate.user.key);
   } else {
     const projectId = result.projectId;
     void (async () => {

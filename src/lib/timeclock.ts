@@ -47,6 +47,14 @@ const DIR = path.join(DATA_DIR, "timeclock");
  * and keep it out of real-project lists.
  */
 export const STANDBY_ID = "standby";
+
+/**
+ * General duty — working, but not on any project: studio management, ops,
+ * marketing, admin. Same pseudo-project trick as standby; the distinction is
+ * semantic: standby = available for assignment, general = actively working
+ * on non-project matters.
+ */
+export const GENERAL_ID = "general";
 const ACTIVE = path.join(DIR, "active.json");
 const AUTO_CLOSE_MS = 12 * 3600_000;
 const LOCK = "timeclock";

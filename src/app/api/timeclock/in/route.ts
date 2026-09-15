@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireUser } from "@/lib/user-key";
-import { clockIn, STANDBY_ID } from "@/lib/timeclock";
+import { clockIn, STANDBY_ID, GENERAL_ID } from "@/lib/timeclock";
 import { fetchProjects } from "@/lib/projects";
-import { syncWorking, syncStandby } from "@/lib/slack-status";
+import { syncWorking, syncStandby, syncGeneral } from "@/lib/slack-status";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -32,6 +32,8 @@ export async function POST(req: NextRequest) {
   const projectId = result.projectId;
   if (projectId === STANDBY_ID) {
     syncStandby(gate.user.key);
+  } else if (projectId === GENERAL_ID) {
+    syncGeneral(gate.user.key);
   } else {
     void (async () => {
       const name = (await fetchProjects()).find((p) => p.id === projectId)?.name;
