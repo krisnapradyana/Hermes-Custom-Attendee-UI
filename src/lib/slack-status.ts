@@ -31,6 +31,9 @@ const STANDBY_EMOJI = ":seat:";
 const GENERAL_EMOJI = ":office:";
 const OUR_EMOJI = new Set([WORKING_EMOJI, BREAK_EMOJI, STANDBY_EMOJI, GENERAL_EMOJI]);
 const EXPIRATION_MS = 13 * 3600_000;
+/** Breaks are short by nature — the status clears itself after 2h even if
+ * the person forgets to resume, so Slack never shows a stale all-day break. */
+const BREAK_EXPIRATION_MS = 2 * 3600_000;
 
 interface TokenFile {
   accessToken: string;
@@ -104,7 +107,7 @@ async function mayWrite(token: string): Promise<boolean> {
 
 async function setStatus(
   userKey: string,
-  status: { text: string; emoji: string } | null
+  status: { text: string; emoji: string; expiresMs?: number } | null
 ): Promise<void> {
   const tok = await readToken(userKey);
   if (!tok) return; // not opted in — nothing to do
@@ -116,7 +119,9 @@ async function setStatus(
       ? {
           status_text: status.text.slice(0, 100),
           status_emoji: status.emoji,
-          status_expiration: Math.floor((Date.now() + EXPIRATION_MS) / 1000),
+          status_expiration: Math.floor(
+            (Date.now() + (status.expiresMs ?? EXPIRATION_MS)) / 1000
+          ),
         }
       : { status_text: "", status_emoji: "" },
   });
@@ -140,7 +145,9 @@ export function syncWorking(userKey: string, projectName?: string): void {
 }
 
 export function syncBreak(userKey: string): void {
-  quiet(setStatus(userKey, { text: "On a break", emoji: BREAK_EMOJI }));
+  quiet(
+    setStatus(userKey, { text: "On a break", emoji: BREAK_EMOJI, expiresMs: BREAK_EXPIRATION_MS })
+  );
 }
 
 export function syncStandby(userKey: string): void {
