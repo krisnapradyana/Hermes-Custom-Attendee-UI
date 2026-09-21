@@ -8,7 +8,6 @@ import {
   Square,
   ArrowLeftRight,
   FolderKanban,
-  ListChecks,
   CornerDownRight,
   Send,
   Coffee,
@@ -113,17 +112,8 @@ export default function ClockPage() {
     return () => clearInterval(t);
   }, []);
 
-  // IF ≥768px (tablet/laptop/PC): YouTube-Music layout — hero tile on the
-  // left, tabbed Projects/Tasks panel on the right. ELSE (phone): the
-  // stacked layout stays exactly as shipped.
-  const [wide, setWide] = useState(false);
-  useEffect(() => {
-    const mq = window.matchMedia("(min-width: 768px)");
-    const apply = () => setWide(mq.matches);
-    apply();
-    mq.addEventListener("change", apply);
-    return () => mq.removeEventListener("change", apply);
-  }, []);
+  // Projects/Tasks tab — every size now (the ≥768px YT-Music split is pure
+  // CSS; the phone shows the same tabs instead of stacked cards).
   const [rightTab, setRightTab] = useState<"projects" | "tasks">("projects");
 
   // When the totals were fetched — lets the "today" numbers tick live between
@@ -390,7 +380,7 @@ export default function ClockPage() {
     </div>
   );
 
-  const activeTasks = me?.active ? tasksFor(me.active.projectId) : [];
+  // (the phone-only "tasks here" card is gone — the My tasks tab covers it)
 
   const greet = (() => {
     const h = new Date(now).getHours();
@@ -537,7 +527,9 @@ export default function ClockPage() {
               min-w-0 is CRITICAL: without it one long project name inflates
               the column past the viewport and clips the buttons (16:9 bug). */}
           <div className="flex flex-col flex-1 min-h-0 min-w-0">
-          {wide && (
+          {/* Tab pills on EVERY size now (was wide-only): the phone stacked
+              a "tasks here" card above the project list — tabs are calmer. */}
+          {(
             <div className="flex gap-1.5 mb-2.5 shrink-0">
               <button
                 onClick={() => setRightTab("projects")}
@@ -562,9 +554,10 @@ export default function ClockPage() {
             </div>
           )}
 
-          {/* Wide "My tasks" tab: ALL my tasks across projects. */}
-          {wide && rightTab === "tasks" && (
-            <div className="glass-panel scroll-fade rounded-2xl border border-line/50 px-3.5 pt-3.5 flex-1 min-h-0 flex flex-col overflow-hidden">
+          {/* "My tasks" tab: ALL my tasks across projects (phone gets the
+              same fixed-height card the project list uses). */}
+          {rightTab === "tasks" && (
+            <div className="glass-panel scroll-fade rounded-2xl border border-line/50 px-3.5 pt-3.5 h-[60dvh] sm:h-auto sm:flex-1 min-h-0 flex flex-col overflow-hidden">
               <div className="flex-1 min-h-0 overflow-y-auto space-y-1.5 pb-4">
                 {me.tasks.map((t) => taskRow(t, true))}
                 {me.tasks.length === 0 && (
@@ -576,21 +569,8 @@ export default function ClockPage() {
             </div>
           )}
 
-          {/* Phone-only: active project's tasks as its own card. */}
-          {!wide && me.active && activeTasks.length > 0 && (
-            <div className="glass-panel scroll-fade rounded-2xl border border-line/50 px-3.5 pt-3.5 mb-3 shrink-0 max-h-[340px] sm:max-h-[176px] flex flex-col overflow-hidden">
-              <p className="flex items-center gap-1.5 text-[10.5px] font-semibold uppercase tracking-[0.08em] text-ink-faint shrink-0">
-                <ListChecks size={11} />
-                My tasks here · {activeTasks.length}
-              </p>
-              <div className="flex-1 min-h-0 overflow-y-auto space-y-1.5 mt-2 pb-4">
-                {activeTasks.map((t) => taskRow(t))}
-              </div>
-            </div>
-          )}
-
-          {/* Projects view (phone always; wide only on the Projects tab). */}
-          {(!wide || rightTab === "projects") && (
+          {/* Projects tab: search + switch list. */}
+          {rightTab === "projects" && (
           <>
           {/* Search */}
           <div className="relative mb-3 shrink-0">
