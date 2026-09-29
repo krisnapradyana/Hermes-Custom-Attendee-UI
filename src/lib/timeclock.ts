@@ -125,6 +125,12 @@ export function weekStart(now = Date.now()): number {
   return (days - dowMon0) * DAY - off;
 }
 
+/** First day of the current CALENDAR month, studio time. */
+export function monthStart(now = Date.now()): number {
+  const d = new Date(now + off);
+  return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 1) - off;
+}
+
 /**
  * ms of a session inside [from, to). Open sessions count to now. Break time
  * (accumulated + a live break passed via extraBreakMs) shortens the session
@@ -386,6 +392,9 @@ export interface MemberPulse {
   lastSeen: string | null; // ISO — latest activity ever (null = never clocked)
   weekByProject: { projectId: string; ms: number }[];
   todayByProject: { projectId: string; ms: number }[];
+  /** Current calendar month (studio time) per project — feeds the studio's
+   * time-spent pies; the main app aggregates and strips the per-member data. */
+  monthByProject: { projectId: string; ms: number }[];
   /** All-time man-hours per project (live session included) — the brief's
    * "Individual project hours": SUM(duration) by user+project. */
   totalByProject: { projectId: string; ms: number }[];
@@ -401,6 +410,7 @@ export function overview(): Promise<MemberPulse[]> {
     const active = await sweep();
     const dFrom = dayStart();
     const wFrom = weekStart();
+    const mFrom = monthStart();
     const now = Date.now();
 
     const members = new Map<string, MemberPulse>();
@@ -422,6 +432,7 @@ export function overview(): Promise<MemberPulse[]> {
           lastSeen: null,
           weekByProject: [],
           todayByProject: [],
+          monthByProject: [],
           totalByProject: [],
         };
         m.name = s.name; // latest name wins
@@ -438,6 +449,7 @@ export function overview(): Promise<MemberPulse[]> {
         const w = overlap(s, wFrom, now, lb);
         m.weekMs += w;
         bump(m.weekByProject, w);
+        bump(m.monthByProject, overlap(s, mFrom, now, lb));
         bump(m.totalByProject, overlap(s, 0, now, lb));
         const seen = s.outAt ?? s.inAt;
         if (!m.lastSeen || seen > m.lastSeen) m.lastSeen = seen;
