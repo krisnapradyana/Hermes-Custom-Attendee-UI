@@ -395,6 +395,9 @@ export interface MemberPulse {
   /** Current calendar month (studio time) per project — feeds the studio's
    * time-spent pies; the main app aggregates and strips the per-member data. */
   monthByProject: { projectId: string; ms: number }[];
+  /** Hours per project inside an explicitly requested month (?month=YYYY-MM)
+   * — powers the constellation's month navigator. Absent when not asked. */
+  rangeByProject?: { projectId: string; ms: number }[];
   /** All-time man-hours per project (live session included) — the brief's
    * "Individual project hours": SUM(duration) by user+project. */
   totalByProject: { projectId: string; ms: number }[];
@@ -405,13 +408,23 @@ export interface MemberPulse {
  * now (and on what, since when), who is idle, and everyone's hours today
  * and this week. One pass over all project files.
  */
-export function overview(): Promise<MemberPulse[]> {
+export function overview(month?: string): Promise<MemberPulse[]> {
   return withLock(LOCK, async () => {
     const active = await sweep();
     const dFrom = dayStart();
     const wFrom = weekStart();
     const mFrom = monthStart();
     const now = Date.now();
+
+    // Explicit month window (YYYY-MM, studio time) for rangeByProject.
+    let rFrom = 0;
+    let rTo = 0;
+    const mm = month && /^\d{4}-\d{2}$/.test(month) ? month : undefined;
+    if (mm) {
+      const [yy, mo] = mm.split("-").map(Number);
+      rFrom = Date.UTC(yy, mo - 1, 1) - off;
+      rTo = Date.UTC(yy, mo, 1) - off;
+    }
 
     const members = new Map<string, MemberPulse>();
     let files: string[] = [];
@@ -433,6 +446,7 @@ export function overview(): Promise<MemberPulse[]> {
           weekByProject: [],
           todayByProject: [],
           monthByProject: [],
+          ...(mm ? { rangeByProject: [] } : {}),
           totalByProject: [],
         };
         m.name = s.name; // latest name wins
@@ -450,6 +464,7 @@ export function overview(): Promise<MemberPulse[]> {
         m.weekMs += w;
         bump(m.weekByProject, w);
         bump(m.monthByProject, overlap(s, mFrom, now, lb));
+        if (mm) bump((m.rangeByProject ??= []), overlap(s, rFrom, Math.min(rTo, now), lb));
         bump(m.totalByProject, overlap(s, 0, now, lb));
         const seen = s.outAt ?? s.inAt;
         if (!m.lastSeen || seen > m.lastSeen) m.lastSeen = seen;

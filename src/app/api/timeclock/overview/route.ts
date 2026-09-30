@@ -15,5 +15,6 @@ export async function GET(req: NextRequest) {
     const gate = await requireUser();
     if (gate.denied) return gate.denied;
   }
-  return NextResponse.json({ members: await overview() });
+  const month = req.nextUrl.searchParams.get("month") ?? undefined;
+  return NextResponse.json({ members: await overview(month) });
 }
